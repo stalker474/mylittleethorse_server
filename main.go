@@ -18,13 +18,16 @@ func main() {
 		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
 	}
 	// Instantiate the contract and display its name
-	race, err := NewBetting(common.HexToAddress("0xdbbe7e0db7c8819925843f73a03c94b495fbaa9a"), conn)
+	race, err := NewBettingCaller(common.HexToAddress("0xd385915904b2bd6502b244195c802c7b90aa261b"), conn)
 	if err != nil {
 		log.Fatalf("Failed to instantiate a Token contract: %v", err)
 	}
-	fmt.Println("Starting time:")
-	chronus, err := race.Chronus(nil)
-	fmt.Println("Starting time:", chronus.StartingTime)
+
+	reward, err := race.RewardTotal(nil)
+	if err != nil {
+		log.Fatalf("Failed to get reward: %v", err)
+	}
+	fmt.Println("Reward total:", reward)
 	http.HandleFunc("/", handle)
 	appengine.Main()
 }
