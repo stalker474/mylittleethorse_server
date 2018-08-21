@@ -3,12 +3,18 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
+
+	"google.golang.org/appengine"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 func main() {
+	http.HandleFunc("/", handle)
+	appengine.Main()
+	
 	// Create an IPC based RPC connection to a remote node
 	conn, err := ethclient.Dial("/home/karalabe/.ethereum/testnet/geth.ipc")
 	if err != nil {
@@ -22,4 +28,9 @@ func main() {
 	chronus, err := race.Chronus(nil)
 	race.FilterRefundEnabled
 	fmt.Println("Starting time:", chronus.StartingTime)
+	
+}
+
+func handle(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "Hello, world!")
 }
