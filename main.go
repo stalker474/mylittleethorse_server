@@ -23,12 +23,9 @@ func main() {
 		log.Fatalf("Failed to instantiate a Token contract: %v", err)
 	}
 	chronus, err := race.Chronus(nil)
-
+	fmt.Println("Starting time:", chronus.StartingTime)
 	http.HandleFunc("/", handle)
 	appengine.Main()
-
-	fmt.Println("Starting time:", chronus.StartingTime)
-
 }
 
 func handle(w http.ResponseWriter, r *http.Request) {
