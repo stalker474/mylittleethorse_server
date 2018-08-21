@@ -22,6 +22,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to instantiate a Token contract: %v", err)
 	}
+	fmt.Println("Starting time:")
 	chronus, err := race.Chronus(nil)
 	fmt.Println("Starting time:", chronus.StartingTime)
 	http.HandleFunc("/", handle)
