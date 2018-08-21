@@ -12,23 +12,23 @@ import (
 )
 
 func main() {
-	http.HandleFunc("/", handle)
-	appengine.Main()
-	
 	// Create an IPC based RPC connection to a remote node
-	conn, err := ethclient.Dial("/home/karalabe/.ethereum/testnet/geth.ipc")
+	conn, err := ethclient.Dial("/home/antonpossylkine/.ethereum/geth.ipc")
 	if err != nil {
 		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
 	}
 	// Instantiate the contract and display its name
-	race, err := NewBetting(common.HexToAddress("0x006b27436b52188d304b78e2ed368f892166c117"), conn)
+	race, err := NewBetting(common.HexToAddress("0xdbbe7e0db7c8819925843f73a03c94b495fbaa9a"), conn)
 	if err != nil {
 		log.Fatalf("Failed to instantiate a Token contract: %v", err)
 	}
 	chronus, err := race.Chronus(nil)
-	race.FilterRefundEnabled
+
+	http.HandleFunc("/", handle)
+	appengine.Main()
+
 	fmt.Println("Starting time:", chronus.StartingTime)
-	
+
 }
 
 func handle(w http.ResponseWriter, r *http.Request) {
