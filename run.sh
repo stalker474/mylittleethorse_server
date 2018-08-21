@@ -1,2 +1,2 @@
-go build -o mle
+go build -o mle -tags linux
 ./mle

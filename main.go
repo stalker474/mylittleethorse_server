@@ -13,7 +13,7 @@ import (
 
 func main() {
 	// Create an IPC based RPC connection to a remote node
-	conn, err := ethclient.Dial("/home/antonpossylkine/.ethereum/geth.ipc")
+	conn, err := ethclient.Dial(ipc)
 	if err != nil {
 		log.Fatalf("Failed to connect to the Ethereum client: %v", err)
 	}
@@ -33,5 +33,8 @@ func main() {
 }
 
 func handle(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Hello, world!")
+
+	races := fetchArchive()
+
+	fmt.Fprintln(w, races[0].ID)
 }
