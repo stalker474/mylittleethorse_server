@@ -11,12 +11,17 @@ import (
 )
 
 var node *Node
+var db Database
 
 func main() {
 	var err error
 	node, err = NewNode(ipc)
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
+	}
+	err = db.Load()
+	if err != nil {
+		log.Println("Failed to fetch database, creating one: %v", err)
 	}
 	log.Println("fetching new data for the first time")
 	fetchNewData()
@@ -29,11 +34,13 @@ func main() {
 
 func updateCache() {
 	for true {
-		log.Println("checking latest withdraws...")
-		checkForLateWithdraws(10) //last 10 races
 		log.Println("fetching new data...")
-		fetchNewData()
+		if !fetchNewData() {
+			log.Println("checking latest withdraws...")
+			checkForLateWithdraws(10) //last 10 races
+		}
 		log.Println("Cache Updated")
+		db.Save()
 		time.Sleep(1 * time.Minute)
 	}
 }
@@ -51,6 +58,9 @@ func fetchNewData() bool {
 	// update new data
 	log.Println("looping through new races to handle")
 	for i := len(RaceCache.List); i < len(races); i++ {
+		if i > 100 {
+			continue
+		}
 		index := i
 		log.Println(index)
 		race, err := fetchRaceData(&races[index], node)
