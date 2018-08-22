@@ -116,11 +116,11 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	if err != nil {
 		return data, err
 	}
-	/*deposits, err := contract.BettingFilterer.FilterDeposit(&bind.FilterOpts{6059602, nil, nil})
+	deposits, err := contract.BettingFilterer.FilterDeposit(&bind.FilterOpts{5000000, nil, nil})
 	if err != nil {
 		return data, err
 	}
-	withdraws, err := contract.BettingFilterer.FilterWithdraw(&bind.FilterOpts{6059602, nil, nil})
+	withdraws, err := contract.BettingFilterer.FilterWithdraw(&bind.FilterOpts{5000000, nil, nil})
 	if err != nil {
 		return data, err
 	}
@@ -132,7 +132,7 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	for withdraws.Next() {
 		data.Withdraws = append(data.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
 	}
-	withdraws.Close()*/
+	withdraws.Close()
 
 	if btcWon {
 		data.WinnerHorses = append(data.WinnerHorses, BTC)

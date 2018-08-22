@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"google.golang.org/appengine"
@@ -13,18 +15,21 @@ import (
 var node *Node
 var db Database
 
+var ops uint64
+
 func main() {
 	var err error
-	node, err = NewNode(ipc)
+	node, err = NewNode("https://mainnet.infura.io")
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
 	}
 	err = db.Load()
 	if err != nil {
 		log.Println("Failed to fetch database, creating one: %v", err)
+		log.Println("fetching new data for the first time")
+		fetchNewData()
 	}
-	log.Println("fetching new data for the first time")
-	fetchNewData()
+
 	log.Println("starting updating loop")
 	go updateCache()
 	log.Println("starting api")
@@ -39,11 +44,17 @@ func updateCache() {
 			log.Println("checking latest withdraws...")
 			checkForLateWithdraws(10) //last 10 races
 		}
-		log.Println("Cache Updated")
-		db.Save()
+		persist()
 		time.Sleep(1 * time.Minute)
 	}
 }
+
+func persist() {
+	db.Save()
+	log.Println("Cache Updated")
+}
+
+var wg sync.WaitGroup
 
 func fetchNewData() bool {
 	var changed bool
@@ -55,24 +66,39 @@ func fetchNewData() bool {
 		return false
 	}
 
+	races = races[0:3]
+
+	var workersCount = len(races) - len(RaceCache.List)
+	log.Println("Creating race data fetching workers (count) :", workersCount)
 	// update new data
 	log.Println("looping through new races to handle")
+	wg.Add(workersCount)
 	for i := len(RaceCache.List); i < len(races); i++ {
-		if i > 100 {
-			continue
-		}
 		index := i
 		log.Println(index)
-		race, err := fetchRaceData(&races[index], node)
-		if err != nil {
-			log.Fatal("Error : %v", err)
-		}
+		var race RaceData
 		RaceCache.List = append(RaceCache.List, race)
-		log.Println("New race added")
+		go asyncFetchRaceData(races[index], &RaceCache.List[len(RaceCache.List)-1], node, messages)
 		changed = true
 	}
 
+	wg.Wait()
+
 	return changed
+}
+
+func asyncFetchRaceData(race Race, raceData *RaceData, node *Node, messages chan int) {
+	defer wg.Done()
+	newRaceData, err := fetchRaceData(&race, node)
+	for err != nil {
+		//log.Println("Error 2: ", err)
+		log.Println("Failed: ", race.RaceNumber)
+		newRaceData, err = fetchRaceData(&race, node)
+	}
+	*raceData = newRaceData
+	atomic.AddUint64(&ops, 1)
+	log.Println("Success: ", race.RaceNumber, " value:", atomic.LoadUint64(&ops))
+	messages <- 3
 }
 
 func checkForLateWithdraws(lastN int) {
