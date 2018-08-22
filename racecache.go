@@ -10,18 +10,21 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// Coin blabla
-type Coin string
-
-// RaceCache current db state
-var RaceCache Cache
-
 // enumerated types
 const (
 	BTC Coin = "BTC"
 	LTC Coin = "LTC"
 	ETH Coin = "ETH"
 )
+
+// Coin blabla
+type Coin string
+
+// RaceCacheJSON current json string
+var RaceCacheJSON string
+
+// RaceCache blabla
+var RaceCache map[uint32]RaceData
 
 func coinFromString(value string) Coin {
 	if strings.Compare(value[0:3], "BTC") == 0 {
@@ -84,6 +87,10 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	if err != nil {
 		return data, err
 	}
+	data.BettingDuration, err = strconv.ParseUint(race.BettingDuration, 10, 64)
+	if err != nil {
+		return data, err
+	}
 	data.EndTime, err = strconv.ParseUint(race.EndTime, 10, 64)
 	if err != nil {
 		return data, err
@@ -112,7 +119,8 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	if err != nil {
 		return data, err
 	}
-	chronus, err := contract.Chronus(nil)
+
+	_, err = contract.Chronus(nil)
 	if err != nil {
 		return data, err
 	}
@@ -143,7 +151,26 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	if ethWon {
 		data.WinnerHorses = append(data.WinnerHorses, ETH)
 	}
-	data.Refunded = chronus.VoidedBet
+	//data.Refunded = chronus.VoidedBet
+
+	data.Volume = 0
+
+	playersMap := make(map[string]bool)
+
+	for _, v := range data.Withdraws[:] {
+		playersMap[v.To] = true
+	}
+
+	refunded := true
+	//if all people who played withdrew, its a refunded race
+	for _, v := range data.Bets[:] {
+		data.Volume += v.Value
+		if !playersMap[v.From] {
+			refunded = false
+		}
+	}
+
+	data.Refunded = refunded
 
 	return data, nil
 }

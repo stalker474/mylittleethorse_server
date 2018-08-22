@@ -5,13 +5,19 @@ import (
 	"io/ioutil"
 )
 
-var tempDbFile = "/tmp/mle_db"
+var tempDbFile = "mle_db.json"
 
+// Database blabla
 type Database struct {
 }
 
+// Save blabla
 func (Database) Save() error {
-	resp, err := json.Marshal(RaceCache)
+	var cache Cache
+	for _, v := range RaceCache {
+		cache.List = append(cache.List, v)
+	}
+	resp, err := json.Marshal(cache)
 	if err != nil {
 		return err
 	}
@@ -19,10 +25,17 @@ func (Database) Save() error {
 	return ioutil.WriteFile(tempDbFile, resp, 0644)
 }
 
+// Load blabla
 func (Database) Load() error {
 	jsonText, err := ioutil.ReadFile(tempDbFile)
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(jsonText, &RaceCache)
+	var cache Cache
+	err = json.Unmarshal(jsonText, &cache)
+
+	for _, v := range cache.List[:] {
+		RaceCache[v.RaceNumber] = v
+	}
+	return nil
 }

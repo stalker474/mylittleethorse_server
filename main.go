@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -23,9 +24,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
 	}
+	RaceCache = make(map[uint32]RaceData)
 	err = db.Load()
 	if err != nil {
-		log.Println("Failed to fetch database, creating one: %v", err)
+		log.Println("Failed to fetch database, creating one : ", err)
 		log.Println("fetching new data for the first time")
 		fetchNewData()
 	}
@@ -41,80 +43,91 @@ func updateCache() {
 	for true {
 		log.Println("fetching new data...")
 		if !fetchNewData() {
-			log.Println("checking latest withdraws...")
-			checkForLateWithdraws(10) //last 10 races
+			log.Println("No changes...")
+		} else {
+			persist()
 		}
-		persist()
+
 		time.Sleep(1 * time.Minute)
 	}
 }
 
 func persist() {
 	db.Save()
+
+	var cacheObject = Cache{}
+
+	for _, value := range RaceCache {
+		cacheObject.List = append(cacheObject.List, value)
+	}
+
+	resp, err := json.Marshal(cacheObject)
+	if err != nil {
+		log.Fatalf("Failed to marshal cache to json: %v", err)
+	}
+
+	RaceCacheJSON = string(resp)
 	log.Println("Cache Updated")
 }
 
 var wg sync.WaitGroup
 
 func fetchNewData() bool {
-	var changed bool
+	changed := false
 	// get finished races list
 	log.Println("fetching ethorse bridge archive race list")
 	races, err := fetchArchive()
 	if err != nil {
-		log.Fatal("Error : %v", err)
+		log.Fatal("Error :", err)
 		return false
 	}
 
-	races = races[0:3]
+	for _, v := range races[:] {
+		number, err := strconv.ParseUint(v.RaceNumber, 10, 32)
+		if err != nil {
+			log.Fatal("Error :", err)
+			return false
+		}
+		if uint64(uint32(number)) != uint64(number) {
+			log.Fatal("Invalid race number")
+			return false
+		}
+		_, exists := RaceCache[uint32(number)]
+		if !exists { //new value
+			log.Println("I dont have this race in cache, try to get it : #", number)
+			wg.Add(1)
+			go asyncFetchRaceData(v, uint32(number), node)
+			changed = true
+		}
 
-	var workersCount = len(races) - len(RaceCache.List)
-	log.Println("Creating race data fetching workers (count) :", workersCount)
-	// update new data
-	log.Println("looping through new races to handle")
-	wg.Add(workersCount)
-	for i := len(RaceCache.List); i < len(races); i++ {
-		index := i
-		log.Println(index)
-		var race RaceData
-		RaceCache.List = append(RaceCache.List, race)
-		go asyncFetchRaceData(races[index], &RaceCache.List[len(RaceCache.List)-1], node, messages)
-		changed = true
 	}
 
 	wg.Wait()
+	log.Println("DONE")
 
 	return changed
 }
 
-func asyncFetchRaceData(race Race, raceData *RaceData, node *Node, messages chan int) {
+func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
 	defer wg.Done()
 	newRaceData, err := fetchRaceData(&race, node)
+	retry := 0
 	for err != nil {
-		//log.Println("Error 2: ", err)
-		log.Println("Failed: ", race.RaceNumber)
-		newRaceData, err = fetchRaceData(&race, node)
-	}
-	*raceData = newRaceData
-	atomic.AddUint64(&ops, 1)
-	log.Println("Success: ", race.RaceNumber, " value:", atomic.LoadUint64(&ops))
-	messages <- 3
-}
-
-func checkForLateWithdraws(lastN int) {
-	length := len(RaceCache.List)
-	for i, v := range RaceCache.List[:] {
-		if i < length-lastN {
-			updateRaceData(&v, node)
+		if retry > 3 {
+			log.Println("FAILED COMPLETELY: race #", race.RaceNumber)
+			return
 		}
+		log.Println("Failed: race #", race.RaceNumber, " retry :", retry)
+		newRaceData, err = fetchRaceData(&race, node)
+		retry++
 	}
+
+	RaceCache[raceNumber] = newRaceData
+	atomic.AddUint64(&ops, 1)
+	log.Println("Success: ", raceNumber, " value:", atomic.LoadUint64(&ops))
 }
 
 func handle(w http.ResponseWriter, r *http.Request) {
-	resp, err := json.Marshal(RaceCache)
-	if err != nil {
-		log.Fatalf("Failed to marshal cache to json: %v", err)
-	}
 
-	fmt.Fprintln(w, string(resp))
+	fmt.Fprintln(w, RaceCacheJSON)
 }
