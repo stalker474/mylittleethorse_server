@@ -40,14 +40,20 @@ func main() {
 	log.Println("starting api on port ", port)
 
 	http.HandleFunc("/api/json", func(w http.ResponseWriter, r *http.Request) {
+		enableCors(&w)
 		fmt.Fprintln(w, RaceCacheJSON.Get())
 	})
 
 	http.HandleFunc("/api/csv", func(w http.ResponseWriter, r *http.Request) {
+		enableCors(&w)
 		fmt.Fprintln(w, RaceCacheJSON.Get())
 	})
 
 	log.Fatal(http.ListenAndServe(":"+port, nil))
+}
+
+func enableCors(w *http.ResponseWriter) {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
 }
 
 func updateCache() {
