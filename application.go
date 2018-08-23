@@ -49,6 +49,24 @@ func main() {
 		fmt.Fprintln(w, RaceCacheJSON.Get())
 	})
 
+	http.HandleFunc("/api/admin/", func(w http.ResponseWriter, r *http.Request) {
+		enableCors(&w)
+		keys, ok := r.URL.Query()["method"]
+
+		if ok || len(keys[0]) < 1 {
+			log.Println("Missing method")
+			return
+		}
+
+		switch keys[0] {
+		case "recache":
+			db.Save()
+			return
+		default:
+			log.Println("Unknown method")
+		}
+	})
+
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
