@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -56,17 +55,6 @@ func updateCache() {
 
 func persist() {
 	db.Save()
-
-	var cacheObject = Cache{}
-
-	for _, value := range RaceCache {
-		cacheObject.List = append(cacheObject.List, value)
-	}
-
-	resp, err := json.Marshal(cacheObject)
-	if err != nil {
-		log.Fatalf("Failed to marshal cache to json: %v", err)
-	}
 	log.Println("Cache Updated")
 }
 
