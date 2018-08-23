@@ -23,7 +23,7 @@ func (Database) Save() error {
 	}
 
 	return ioutil.WriteFile(tempDbFile, resp, 0644)
-	RaceCacheJSON = string(resp)
+	RaceCacheJSON.Set(string(resp))
 
 	return nil
 }
@@ -36,7 +36,7 @@ func (Database) Load() error {
 	}
 	var cache Cache
 	err = json.Unmarshal(jsonText, &cache)
-	RaceCacheJSON = string(jsonText)
+	RaceCacheJSON.Set(string(jsonText))
 	for _, v := range cache.List[:] {
 		RaceCache[v.RaceNumber] = v
 	}

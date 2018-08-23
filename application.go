@@ -40,7 +40,7 @@ func main() {
 	log.Println("starting api on port ", port)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, RaceCacheJSON)
+		fmt.Fprintln(w, RaceCacheJSON.Get())
 	})
 
 	log.Fatal(http.ListenAndServe(":"+port, nil))
