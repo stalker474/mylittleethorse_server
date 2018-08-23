@@ -40,7 +40,7 @@ func main() {
 	log.Println("starting api on port ", port)
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "plop")
+		fmt.Fprintln(w, RaceCacheJSON)
 	})
 
 	log.Fatal(http.ListenAndServe(":"+port, nil))
@@ -119,9 +119,4 @@ func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
 	RaceCache[raceNumber] = newRaceData
 	atomic.AddUint64(&ops, 1)
 	log.Println("Success: ", raceNumber, " value:", atomic.LoadUint64(&ops))
-}
-
-func handle(w http.ResponseWriter, r *http.Request) {
-
-	fmt.Fprintln(w, RaceCacheJSON)
 }
