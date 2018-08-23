@@ -49,7 +49,7 @@ func main() {
 		fmt.Fprintln(w, RaceCacheJSON.Get())
 	})
 
-	http.HandleFunc("/api/admin/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/admin", func(w http.ResponseWriter, r *http.Request) {
 		enableCors(&w)
 		keys, ok := r.URL.Query()["method"]
 
