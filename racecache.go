@@ -150,19 +150,10 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	if err != nil {
 		return data, err
 	}
-	withdraws, err := contract.BettingFilterer.FilterWithdraw(&bind.FilterOpts{5000000, nil, nil})
-	if err != nil {
-		return data, err
-	}
 	for deposits.Next() {
 		data.Bets = append(data.Bets, Bet{WeiToEth(deposits.Event.Value), coinFromString(FromBytes32(deposits.Event.Horse)), deposits.Event.From.Hex()})
 	}
 	deposits.Close()
-
-	for withdraws.Next() {
-		data.Withdraws = append(data.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
-	}
-	withdraws.Close()
 
 	if btcWon {
 		data.WinnerHorses = append(data.WinnerHorses, BTC)
@@ -176,23 +167,12 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	//data.Refunded = chronus.VoidedBet
 
 	data.Volume = 0
-
-	playersMap := make(map[string]bool)
-
-	for _, v := range data.Withdraws[:] {
-		playersMap[v.To] = true
-	}
-
-	refunded := true
 	//if all people who played withdrew, its a refunded race
 	for _, v := range data.Bets[:] {
 		data.Volume += v.Value
-		if !playersMap[v.From] {
-			refunded = false
-		}
 	}
 
-	data.Refunded = refunded
+	updateRaceData(&data, node)
 
 	return data, nil
 }
@@ -217,6 +197,22 @@ func updateRaceData(race *RaceData, node *Node) error {
 		race.Withdraws = append(race.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
 	}
 	withdraws.Close()
+
+	playersMap := make(map[string]bool)
+
+	for _, v := range race.Withdraws[:] {
+		playersMap[v.To] = true
+	}
+
+	refunded := true
+	//if all people who played withdrew, its a refunded race
+	for _, v := range race.Bets[:] {
+		if !playersMap[v.From] {
+			refunded = false
+		}
+	}
+
+	race.Refunded = refunded
 
 	return nil
 }

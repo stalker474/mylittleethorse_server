@@ -96,6 +96,19 @@ func fetchNewData() bool {
 			wg.Add(1)
 			go asyncFetchRaceData(v, uint32(number), node)
 			changed = true
+		} else {
+			log.Println("This race is already cached : #", number)
+			wg.Add(1)
+			then, err := strconv.ParseInt(v.Date, 10, 64)
+			if err != nil {
+				log.Fatal("Error :", err)
+				return false
+			}
+			elapsed := time.Now().Unix() - then
+			if elapsed < 48*60*60 {
+				log.Println("This race is less than 48 hours old, update its withdraws and refunded state : #", number)
+				go asyncUpdateRaceData(v, uint32(number), node)
+			}
 		}
 
 	}
@@ -107,6 +120,25 @@ func fetchNewData() bool {
 }
 
 func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
+	defer wg.Done()
+	newRaceData, err := fetchRaceData(&race, node)
+	retry := 0
+	for err != nil {
+		if retry > 3 {
+			log.Println("FAILED COMPLETELY: race #", race.RaceNumber)
+			return
+		}
+		log.Println("Failed: race #", race.RaceNumber, " retry :", retry)
+		newRaceData, err = fetchRaceData(&race, node)
+		retry++
+	}
+
+	RaceCache[raceNumber] = newRaceData
+	atomic.AddUint64(&ops, 1)
+	log.Println("Success: ", raceNumber, " value:", atomic.LoadUint64(&ops))
+}
+
+func asyncUpdateRaceData(race Race, raceNumber uint32, node *Node) {
 	defer wg.Done()
 	newRaceData, err := fetchRaceData(&race, node)
 	retry := 0
