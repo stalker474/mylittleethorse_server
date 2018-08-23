@@ -67,8 +67,6 @@ func persist() {
 	if err != nil {
 		log.Fatalf("Failed to marshal cache to json: %v", err)
 	}
-
-	RaceCacheJSON = string(resp)
 	log.Println("Cache Updated")
 }
 
