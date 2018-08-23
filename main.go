@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"google.golang.org/appengine"
+	"github.com/gorilla/mux"
 )
 
 var node *Node
@@ -34,9 +34,11 @@ func main() {
 
 	log.Println("starting updating loop")
 	go updateCache()
-	log.Println("starting api")
-	http.HandleFunc("/", handle)
-	appengine.Main()
+	log.Println("starting api on port 3000")
+
+	router := mux.NewRouter().StrictSlash(true)
+	router.HandleFunc("/api", handle)
+	log.Fatal(http.ListenAndServe(":3000", nil))
 }
 
 func updateCache() {
