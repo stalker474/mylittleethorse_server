@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"strconv"
+	"sync"
 
 	"strings"
 
@@ -20,8 +21,29 @@ const (
 // Coin blabla
 type Coin string
 
-// RaceCacheJSON current json string
-var RaceCacheJSON string
+// RaceCacheJSON blabla
+var RaceCacheJSON SafeCache
+
+// SafeCache is the current cache state
+type SafeCache struct {
+	RaceCacheJSON string
+	mux           sync.Mutex
+}
+
+// Set Thread safe value set
+func (cache *SafeCache) Set(value string) {
+	cache.mux.Lock()
+	cache.RaceCacheJSON = value
+	cache.mux.Unlock()
+}
+
+// Get thread safe value get
+func (cache *SafeCache) Get() (str string) {
+	cache.mux.Lock()
+	str = cache.RaceCacheJSON
+	cache.mux.Unlock()
+	return str
+}
 
 // RaceCache blabla
 var RaceCache map[uint32]RaceData
