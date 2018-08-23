@@ -1,72 +1,86 @@
 package main
 
 import (
+	"bytes"
+	"encoding/csv"
+	"encoding/json"
 	"log"
 	"strconv"
-	"sync"
-
 	"strings"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 )
 
-// enumerated types
-const (
-	BTC Coin = "BTC"
-	LTC Coin = "LTC"
-	ETH Coin = "ETH"
-)
-
-// Coin blabla
-type Coin string
-
-// RaceCacheJSON blabla
-var RaceCacheJSON SafeCache
+// RaceCacheString blabla
+var RaceCacheString SafeCache
 
 // SafeCache is the current cache state
 type SafeCache struct {
 	RaceCacheJSON string
+	RaceCacheCSV  string
 	mux           sync.Mutex
 }
 
 // Set Thread safe value set
-func (cache *SafeCache) Set(value string) {
-	cache.mux.Lock()
-	cache.RaceCacheJSON = value
-	cache.mux.Unlock()
+func (c *SafeCache) Set(cache *Cache) error {
+	data, err := json.Marshal(cache)
+	if err != nil {
+		return err
+	}
+	c.mux.Lock()
+	c.RaceCacheJSON = string(data)
+
+	records := [][]string{
+		{"race_number", "date", "race_duration", "betting_duration", "end_time", "winner_horses", "volume", "refunded"},
+	}
+	for _, v := range cache.List[:] {
+		var strs []string
+
+		strs = append(strs,
+			strconv.FormatInt(int64(v.RaceNumber), 10),
+			strconv.FormatUint(v.Date, 10),
+			strconv.FormatUint(v.RaceDuration, 10),
+			strconv.FormatUint(v.BettingDuration, 10),
+			strconv.FormatUint(v.EndTime, 10),
+			strings.Join(v.WinnerHorses[:], "&"),
+			strconv.FormatFloat(float64(v.Volume), 'f', 2, 32),
+			strconv.FormatBool(v.Refunded),
+		)
+		records = append(records, strs)
+	}
+	var buffer bytes.Buffer
+	w := csv.NewWriter(&buffer)
+	w.WriteAll(records)
+	c.RaceCacheCSV = buffer.String()
+	c.mux.Unlock()
+	return nil
 }
 
-// Get thread safe value get
-func (cache *SafeCache) Get() (str string) {
-	cache.mux.Lock()
-	str = cache.RaceCacheJSON
-	cache.mux.Unlock()
+// GetJSON thread safe value get
+func (c *SafeCache) GetJSON() (str string) {
+	c.mux.Lock()
+	str = c.RaceCacheJSON
+	c.mux.Unlock()
+	return str
+}
+
+// GetCSV thread safe value get
+func (c *SafeCache) GetCSV() (str string) {
+	c.mux.Lock()
+	str = c.RaceCacheCSV
+	c.mux.Unlock()
 	return str
 }
 
 // RaceCache blabla
 var RaceCache map[uint32]RaceData
 
-func coinFromString(value string) Coin {
-	if strings.Compare(value[0:3], "BTC") == 0 {
-		return BTC
-	}
-	if strings.Compare(value[0:3], "LTC") == 0 {
-		return LTC
-	}
-	if strings.Compare(value[0:3], "ETH") == 0 {
-		return ETH
-	}
-	//log.Fatalf("Invalid coin value")
-	log.Println("Error :" + value)
-	return BTC
-}
-
 // Bet blabla
 type Bet struct {
 	Value float32 `json:"value"`
-	Horse Coin    `json:"horse"`
+	Horse string  `json:"horse"`
 	From  string  `json:"from"`
 }
 
@@ -84,7 +98,7 @@ type RaceData struct {
 	BettingDuration uint64     `json:"betting_duration"`
 	EndTime         uint64     `json:"end_time"`
 	RaceNumber      uint32     `json:"race_number"`
-	WinnerHorses    []Coin     `json:"winner_horses"`
+	WinnerHorses    []string   `json:"winner_horses"`
 	Bets            []Bet      `json:"bets"`
 	Withdraws       []Withdraw `json:"withdraws"`
 	Volume          float32    `json:"volume"`
@@ -93,7 +107,8 @@ type RaceData struct {
 
 // Cache blabla
 type Cache struct {
-	List []RaceData `json:"list"`
+	List       []RaceData `json:"list"`
+	LastUpdate int64      `json:"last_update"`
 }
 
 func fetchRaceData(race *Race, node *Node) (RaceData, error) {
@@ -123,67 +138,69 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	}
 	data.RaceNumber = uint32(raceNumber)
 
-	// Instantiate the contract and display its name
-	contract, err := NewBetting(common.HexToAddress(race.ContractID), node.Conn)
-	if err != nil {
-		return data, err
-	}
-
-	btcWon, err := contract.WinnerHorse(nil, ToBytes32(string(BTC)))
-	if err != nil {
-		return data, err
-	}
-	ltcWon, err := contract.WinnerHorse(nil, ToBytes32(string(LTC)))
-	if err != nil {
-		return data, err
-	}
-	ethWon, err := contract.WinnerHorse(nil, ToBytes32(string(ETH)))
-	if err != nil {
-		return data, err
-	}
-
-	_, err = contract.Chronus(nil)
-	if err != nil {
-		return data, err
-	}
-	deposits, err := contract.BettingFilterer.FilterDeposit(&bind.FilterOpts{5000000, nil, nil})
-	if err != nil {
-		return data, err
-	}
-	for deposits.Next() {
-		data.Bets = append(data.Bets, Bet{WeiToEth(deposits.Event.Value), coinFromString(FromBytes32(deposits.Event.Horse)), deposits.Event.From.Hex()})
-	}
-	deposits.Close()
-
-	if btcWon {
-		data.WinnerHorses = append(data.WinnerHorses, BTC)
-	}
-	if ltcWon {
-		data.WinnerHorses = append(data.WinnerHorses, LTC)
-	}
-	if ethWon {
-		data.WinnerHorses = append(data.WinnerHorses, ETH)
-	}
-	//data.Refunded = chronus.VoidedBet
-
-	data.Volume = 0
-	//if all people who played withdrew, its a refunded race
-	for _, v := range data.Bets[:] {
-		data.Volume += v.Value
-	}
-
-	updateRaceData(&data, node)
+	updateRaceData(&data, true, node)
 
 	return data, nil
 }
 
-func updateRaceData(race *RaceData, node *Node) (bool, error) {
+func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 	var err error
+
+	changed := false
 
 	// Instantiate the contract and display its name
 	contract, err := NewBetting(common.HexToAddress(race.ContractID), node.Conn)
 	if err != nil {
 		return false, err
+	}
+
+	btcWon, err := contract.WinnerHorse(nil, ToBytes32("BTC"))
+	if err != nil {
+		return false, err
+	}
+	ltcWon, err := contract.WinnerHorse(nil, ToBytes32("LTC"))
+	if err != nil {
+		return false, err
+	}
+	ethWon, err := contract.WinnerHorse(nil, ToBytes32("ETH"))
+	if err != nil {
+		return false, err
+	}
+
+	c, err := contract.Chronus(nil)
+	if err != nil {
+		return false, err
+	}
+	if c.BettingDuration > 0 {
+		log.Println("DATAAAAAAAA ", c.BettingDuration)
+	}
+
+	deposits, err := contract.BettingFilterer.FilterDeposit(&bind.FilterOpts{5000000, nil, nil})
+	if err != nil {
+		return false, err
+	}
+	var newBets []Bet
+	for deposits.Next() {
+		newBets = append(newBets, Bet{WeiToEth(deposits.Event.Value), FromBytes32(deposits.Event.Horse), deposits.Event.From.Hex()})
+	}
+	if len(newBets) != len(race.Bets) {
+		race.Bets = newBets
+		changed = true
+	}
+	deposits.Close()
+
+	if btcWon || ltcWon || ethWon {
+		race.WinnerHorses = nil
+	}
+
+	if btcWon {
+		race.WinnerHorses = append(race.WinnerHorses, "BTC")
+	}
+	if ltcWon {
+		race.WinnerHorses = append(race.WinnerHorses, "LTC")
+	}
+	if ethWon {
+		race.WinnerHorses = append(race.WinnerHorses, "ETH")
 	}
 
 	withdraws, err := contract.BettingFilterer.FilterWithdraw(&bind.FilterOpts{6059602, nil, nil})
@@ -191,18 +208,17 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 		return false, err
 	}
 
-	prevLength := len(race.Withdraws)
-
-	race.Withdraws = nil
+	var newWithdraws []Withdraw
 
 	for withdraws.Next() {
-		race.Withdraws = append(race.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
+		newWithdraws = append(newWithdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
 	}
 	withdraws.Close()
 
-	newLength := len(race.Withdraws)
-
-	changed := prevLength != newLength
+	if len(newWithdraws) != len(race.Withdraws) {
+		race.Withdraws = newWithdraws
+		changed = true
+	}
 
 	playersMap := make(map[string]bool)
 
@@ -211,8 +227,10 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 	}
 
 	refunded := true
+	race.Volume = 0
 	//if all people who played withdrew, its a refunded race
 	for _, v := range race.Bets[:] {
+		race.Volume += v.Value
 		if !playersMap[v.From] {
 			refunded = false
 		}

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"sort"
+	"time"
 )
 
 var tempDbFile = "mle_db.json"
@@ -17,7 +18,7 @@ type ByRaceNumber []RaceData
 
 func (a ByRaceNumber) Len() int           { return len(a) }
 func (a ByRaceNumber) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByRaceNumber) Less(i, j int) bool { return a[i].RaceNumber < a[j].RaceNumber }
+func (a ByRaceNumber) Less(i, j int) bool { return a[i].RaceNumber > a[j].RaceNumber }
 
 // Save blabla
 func (Database) Save() error {
@@ -25,13 +26,14 @@ func (Database) Save() error {
 	for _, v := range RaceCache {
 		cache.List = append(cache.List, v)
 	}
+	cache.LastUpdate = time.Now().Unix()
 	sort.Sort(ByRaceNumber(cache.List))
 	resp, err := json.Marshal(cache)
 	if err != nil {
 		return err
 	}
 
-	RaceCacheJSON.Set(string(resp))
+	RaceCacheString.Set(&cache)
 	return ioutil.WriteFile(tempDbFile, resp, 0644)
 }
 
@@ -43,7 +45,7 @@ func (Database) Load() error {
 	}
 	var cache Cache
 	err = json.Unmarshal(jsonText, &cache)
-	RaceCacheJSON.Set(string(jsonText))
+	RaceCacheString.Set(&cache)
 	for _, v := range cache.List[:] {
 		RaceCache[v.RaceNumber] = v
 	}
