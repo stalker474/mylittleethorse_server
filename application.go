@@ -54,16 +54,17 @@ func main() {
 		keys, ok := r.URL.Query()["method"]
 
 		if ok || len(keys[0]) < 1 {
-			log.Println("Missing method")
+			fmt.Fprintln(w, "Missing method")
 			return
 		}
 
 		switch keys[0] {
 		case "recache":
 			db.Save()
+			fmt.Fprintln(w, "Recached")
 			return
 		default:
-			log.Println("Unknown method")
+			fmt.Fprintln(w, "Unknown method")
 		}
 	})
 
