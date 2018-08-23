@@ -53,7 +53,7 @@ func main() {
 		enableCors(&w)
 		keys, ok := r.URL.Query()["method"]
 
-		if ok || len(keys[0]) < 1 {
+		if !ok || len(keys[0]) < 1 {
 			fmt.Fprintln(w, "Missing method")
 			return
 		}
