@@ -9,8 +9,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/gorilla/mux"
 )
 
 var node *Node
@@ -41,8 +39,10 @@ func main() {
 	go updateCache()
 	log.Println("starting api on port ", port)
 
-	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/", handle)
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "plop")
+	})
+
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
