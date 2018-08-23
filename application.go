@@ -39,7 +39,11 @@ func main() {
 	go updateCache()
 	log.Println("starting api on port ", port)
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/json", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, RaceCacheJSON.Get())
+	})
+
+	http.HandleFunc("/api/csv", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, RaceCacheJSON.Get())
 	})
 
