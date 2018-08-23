@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"io/ioutil"
+	"sort"
 )
 
 var tempDbFile = "mle_db.json"
@@ -11,21 +12,27 @@ var tempDbFile = "mle_db.json"
 type Database struct {
 }
 
+// ByRaceNumber sorter
+type ByRaceNumber []RaceData
+
+func (a ByRaceNumber) Len() int           { return len(a) }
+func (a ByRaceNumber) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByRaceNumber) Less(i, j int) bool { return a[i].RaceNumber < a[j].RaceNumber }
+
 // Save blabla
 func (Database) Save() error {
 	var cache Cache
 	for _, v := range RaceCache {
 		cache.List = append(cache.List, v)
 	}
+	sort.Sort(ByRaceNumber(cache.List))
 	resp, err := json.Marshal(cache)
 	if err != nil {
 		return err
 	}
 
-	return ioutil.WriteFile(tempDbFile, resp, 0644)
 	RaceCacheJSON.Set(string(resp))
-
-	return nil
+	return ioutil.WriteFile(tempDbFile, resp, 0644)
 }
 
 // Load blabla
