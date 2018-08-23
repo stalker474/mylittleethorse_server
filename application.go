@@ -95,9 +95,10 @@ func persist() {
 }
 
 var wg sync.WaitGroup
+var saveNeeded bool
 
 func fetchNewData() bool {
-	changed := false
+	saveNeeded = false
 	// get finished races list
 	log.Println("fetching ethorse bridge archive race list")
 	races, err := fetchArchive()
@@ -121,7 +122,6 @@ func fetchNewData() bool {
 			log.Println("I dont have this race in cache, try to get it : #", number)
 			wg.Add(1)
 			go asyncFetchRaceData(v, uint32(number), node)
-			changed = true
 		} else {
 			log.Println("This race is already cached : #", number)
 			wg.Add(1)
@@ -133,7 +133,7 @@ func fetchNewData() bool {
 			elapsed := time.Now().Unix() - then
 			if elapsed < 48*60*60 {
 				log.Println("This race is less than 48 hours old, update its withdraws and refunded state : #", number)
-				go asyncUpdateRaceData(v, uint32(number), node)
+				go asyncUpdateRaceData(uint32(number), node)
 			}
 		}
 
@@ -142,7 +142,7 @@ func fetchNewData() bool {
 	wg.Wait()
 	log.Println("DONE")
 
-	return changed
+	return saveNeeded
 }
 
 func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
@@ -162,11 +162,14 @@ func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
 	RaceCache[raceNumber] = newRaceData
 	atomic.AddUint64(&ops, 1)
 	log.Println("Success: ", raceNumber, " value:", atomic.LoadUint64(&ops))
+
+	saveNeeded = true
 }
 
-func asyncUpdateRaceData(race Race, raceNumber uint32, node *Node) {
+func asyncUpdateRaceData(raceNumber uint32, node *Node) {
 	defer wg.Done()
-	newRaceData, err := fetchRaceData(&race, node)
+	race, _ := RaceCache[raceNumber]
+	changed, err := updateRaceData(&race, node)
 	retry := 0
 	for err != nil {
 		if retry > 3 {
@@ -174,11 +177,14 @@ func asyncUpdateRaceData(race Race, raceNumber uint32, node *Node) {
 			return
 		}
 		log.Println("Failed: race #", race.RaceNumber, " retry :", retry)
-		newRaceData, err = fetchRaceData(&race, node)
+		changed, err = updateRaceData(&race, node)
 		retry++
 	}
 
-	RaceCache[raceNumber] = newRaceData
+	RaceCache[raceNumber] = race
 	atomic.AddUint64(&ops, 1)
 	log.Println("Success: ", raceNumber, " value:", atomic.LoadUint64(&ops))
+	if changed {
+		saveNeeded = true
+	}
 }

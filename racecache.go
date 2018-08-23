@@ -177,19 +177,21 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	return data, nil
 }
 
-func updateRaceData(race *RaceData, node *Node) error {
+func updateRaceData(race *RaceData, node *Node) (bool, error) {
 	var err error
 
 	// Instantiate the contract and display its name
 	contract, err := NewBetting(common.HexToAddress(race.ContractID), node.Conn)
 	if err != nil {
-		return err
+		return false, err
 	}
 
 	withdraws, err := contract.BettingFilterer.FilterWithdraw(&bind.FilterOpts{6059602, nil, nil})
 	if err != nil {
-		return err
+		return false, err
 	}
+
+	prevLength := len(race.Withdraws)
 
 	race.Withdraws = nil
 
@@ -197,6 +199,10 @@ func updateRaceData(race *RaceData, node *Node) error {
 		race.Withdraws = append(race.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
 	}
 	withdraws.Close()
+
+	newLength := len(race.Withdraws)
+
+	changed := prevLength != newLength
 
 	playersMap := make(map[string]bool)
 
@@ -214,5 +220,5 @@ func updateRaceData(race *RaceData, node *Node) error {
 
 	race.Refunded = refunded
 
-	return nil
+	return changed, nil
 }
