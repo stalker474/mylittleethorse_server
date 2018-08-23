@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -18,6 +19,11 @@ var db Database
 var ops uint64
 
 func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	var err error
 	node, err = NewNode("https://mainnet.infura.io")
 	if err != nil {
@@ -33,11 +39,11 @@ func main() {
 
 	log.Println("starting updating loop")
 	go updateCache()
-	log.Println("starting api on port 3000")
+	log.Println("starting api on port ", port)
 
 	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/api", handle)
-	log.Fatal(http.ListenAndServe(":3000", nil))
+	router.HandleFunc("/", handle)
+	log.Fatal(http.ListenAndServe(":"+port, nil))
 }
 
 func updateCache() {
