@@ -171,14 +171,15 @@ func fetchNewData(full bool) bool {
 
 		}
 	} else {
+		wg.Add(len(RaceCache))
+		atomic.AddUint64(&ops, uint64(len(RaceCache)))
 		//its a full refresh, we reload all race data from blockchain
 		for _, value := range RaceCache {
-			atomic.AddUint64(&ops, 1)
 			go asyncUpdateRaceData(value.RaceNumber, true, node)
 		}
 		atomic.StoreUint32(&saveNeeded, 1) //always save
 	}
-	wg.Add(len(RaceCache))
+
 	wg.Wait()
 	log.Println("DONE")
 
