@@ -243,17 +243,13 @@ func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 		playersMap[v.To] = true
 	}
 
-	refunded := true
 	race.Volume = 0
 	//if all people who played withdrew, its a refunded race
 	for _, v := range race.Bets[:] {
 		race.Volume += v.Value
-		if !playersMap[v.From] {
-			refunded = false
-		}
 	}
 
-	race.Refunded = refunded
+	race.Refunded = (race.Volume == 0) || (race.WinnerHorses == nil)
 
 	return changed, nil
 }
