@@ -48,7 +48,13 @@ func main() {
 
 	http.HandleFunc("/api/json", func(w http.ResponseWriter, r *http.Request) {
 		enableCors(&w)
-		fmt.Fprintln(w, RaceCacheString.GetJSON())
+		_, zipped := r.URL.Query()["gz"]
+		if zipped {
+			fmt.Fprintln(w, RaceCacheString.GetZIP())
+		} else {
+			fmt.Fprintln(w, RaceCacheString.GetJSON())
+		}
+
 	})
 
 	http.HandleFunc("/api/csv", func(w http.ResponseWriter, r *http.Request) {
@@ -105,12 +111,13 @@ func updateCache() {
 		if atomic.LoadUint32(&fullRefresh) == 1 {
 			log.Println("performing full blockchain data refresh")
 			fetchNewData(true)
+			persist()
 			atomic.SwapUint32(&fullRefresh, 0)
 		}
 		if !fetchNewData(false) {
 			log.Println("No changes...")
 		} else {
-			persist()
+
 		}
 		atomic.StoreUint32(&fullRefresh, 0)
 		time.Sleep(1 * time.Minute)

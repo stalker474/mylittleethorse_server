@@ -60,8 +60,8 @@ func (c *SafeCache) Set(cache *Cache) error {
 		records = append(records, strs)
 	}
 	var buffer bytes.Buffer
-	w := csv.NewWriter(&buffer)
-	w.WriteAll(records)
+	wr := csv.NewWriter(&buffer)
+	wr.WriteAll(records)
 	c.RaceCacheCSV = buffer.String()
 	c.mux.Unlock()
 	return nil
