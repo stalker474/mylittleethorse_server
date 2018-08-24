@@ -175,19 +175,21 @@ func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 		log.Println("DATAAAAAAAA ", c.BettingDuration)
 	}
 
-	deposits, err := contract.BettingFilterer.FilterDeposit(&bind.FilterOpts{5000000, nil, nil})
-	if err != nil {
-		return false, err
+	if full { //only fetch deposits during full update
+		deposits, err := contract.BettingFilterer.FilterDeposit(&bind.FilterOpts{5000000, nil, nil})
+		if err != nil {
+			return false, err
+		}
+		var newBets []Bet
+		for deposits.Next() {
+			newBets = append(newBets, Bet{WeiToEth(deposits.Event.Value), FromBytes32(deposits.Event.Horse), deposits.Event.From.Hex()})
+		}
+		if len(newBets) != len(race.Bets) {
+			race.Bets = newBets
+			changed = true
+		}
+		deposits.Close()
 	}
-	var newBets []Bet
-	for deposits.Next() {
-		newBets = append(newBets, Bet{WeiToEth(deposits.Event.Value), FromBytes32(deposits.Event.Horse), deposits.Event.From.Hex()})
-	}
-	if len(newBets) != len(race.Bets) {
-		race.Bets = newBets
-		changed = true
-	}
-	deposits.Close()
 
 	if btcWon || ltcWon || ethWon {
 		race.WinnerHorses = nil
