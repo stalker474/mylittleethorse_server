@@ -17,6 +17,7 @@ var db Database
 
 var ops uint64
 var fullRefresh uint32
+var refreshRate uint32 = 10
 
 var wg sync.WaitGroup
 var saveNeeded uint32
@@ -120,7 +121,7 @@ func updateCache() {
 
 		}
 		atomic.StoreUint32(&fullRefresh, 0)
-		time.Sleep(1 * time.Minute)
+		time.Sleep(refreshRate * time.Second)
 	}
 }
 
