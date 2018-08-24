@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/zlib"
 	"encoding/csv"
 	"encoding/json"
 	"log"
@@ -18,9 +19,10 @@ var RaceCacheString SafeCache
 
 // SafeCache is the current cache state
 type SafeCache struct {
-	RaceCacheJSON string
-	RaceCacheCSV  string
-	mux           sync.Mutex
+	RaceCacheJSON    string
+	RaceCacheCSV     string
+	RaceCacheJSONZIP string
+	mux              sync.Mutex
 }
 
 // Set Thread safe value set
@@ -31,6 +33,13 @@ func (c *SafeCache) Set(cache *Cache) error {
 	}
 	c.mux.Lock()
 	c.RaceCacheJSON = string(data)
+
+	var b bytes.Buffer
+	w := zlib.NewWriter(&b)
+	w.Write(data)
+	w.Close()
+
+	c.RaceCacheJSONZIP = b.String()
 
 	records := [][]string{
 		{"race_number", "date", "race_duration", "betting_duration", "end_time", "winner_horses", "volume", "refunded"},
@@ -62,6 +71,14 @@ func (c *SafeCache) Set(cache *Cache) error {
 func (c *SafeCache) GetJSON() (str string) {
 	c.mux.Lock()
 	str = c.RaceCacheJSON
+	c.mux.Unlock()
+	return str
+}
+
+// GetZIP thread safe value get
+func (c *SafeCache) GetZIP() (str string) {
+	c.mux.Lock()
+	str = c.RaceCacheJSONZIP
 	c.mux.Unlock()
 	return str
 }
