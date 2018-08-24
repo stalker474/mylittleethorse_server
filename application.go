@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -17,7 +18,7 @@ var db Database
 
 var ops uint64
 var fullRefresh uint32
-var refreshRate uint32 = 10
+var refreshRate int64 = 10
 
 var wg sync.WaitGroup
 var saveNeeded uint32
@@ -121,7 +122,7 @@ func updateCache() {
 
 		}
 		atomic.StoreUint32(&fullRefresh, 0)
-		time.Sleep(refreshRate * time.Second)
+		time.Sleep(time.Duration(refreshRate) * time.Second)
 	}
 }
 
@@ -196,14 +197,16 @@ func fetchNewData(full bool) bool {
 
 func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
 	defer wg.Done()
-	newRaceData, err := fetchRaceData(&race, node)
 	retry := 0
+	err := errors.New("")
+	var newRaceData RaceData
 	for err != nil {
 		if retry > 5 {
 			log.Println("FAILED COMPLETELY: race #", race.RaceNumber)
 			listFailedMutex.Lock()
 			listFailed = append(listFailed, raceNumber)
 			listFailedMutex.Unlock()
+			atomic.AddUint64(&ops, ^uint64(0))
 			return
 		}
 		log.Println("Failed: race #", race.RaceNumber, " retry :", retry)
@@ -221,11 +224,17 @@ func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
 func asyncUpdateRaceData(raceNumber uint32, full bool, node *Node) {
 	defer wg.Done()
 	race, _ := RaceCache[raceNumber]
-	changed, err := updateRaceData(&race, full, node)
 	retry := 0
+	err := errors.New("")
+	changed := false
 	for err != nil {
-		if retry > 3 {
+		if retry > 5 {
+
 			log.Println("FAILED COMPLETELY: race #", race.RaceNumber)
+			listFailedMutex.Lock()
+			listFailed = append(listFailed, raceNumber)
+			listFailedMutex.Unlock()
+			atomic.AddUint64(&ops, ^uint64(0))
 			return
 		}
 		log.Println("Failed: race #", race.RaceNumber, " retry :", retry)
