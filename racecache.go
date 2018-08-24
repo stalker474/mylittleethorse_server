@@ -244,12 +244,17 @@ func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 	}
 
 	race.Volume = 0
+	somebodyWon := false
+	winners := strings.Join(race.WinnerHorses, "")
 	//if all people who played withdrew, its a refunded race
 	for _, v := range race.Bets[:] {
 		race.Volume += v.Value
+		if strings.Contains(winners, v.Horse) {
+			somebodyWon = true
+		}
 	}
 
-	race.Refunded = (race.Volume == 0) || (race.WinnerHorses == nil) || (len(race.Bets) == 1)
+	race.Refunded = (race.Volume == 0) || (race.WinnerHorses == nil) || (len(race.Bets) == 1) || (!somebodyWon)
 
 	return changed, nil
 }
