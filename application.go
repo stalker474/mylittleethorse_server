@@ -62,6 +62,9 @@ func main() {
 
 		if !ok || len(keys[0]) < 1 {
 			fmt.Fprintln(w, "Missing method")
+			fmt.Fprintln(w, "updatedb : refreshes json cache data from current state")
+			fmt.Fprintln(w, "recache : refresh ALL data keeping only old ethorse bridge info")
+			fmt.Fprintln(w, "report : gives info about current update status")
 			return
 		}
 
@@ -97,7 +100,6 @@ func enableCors(w *http.ResponseWriter) {
 }
 
 func updateCache() {
-	atomic.StoreUint32(&fullRefresh, 0)
 	for true {
 		log.Println("fetching new data...")
 		if atomic.LoadUint32(&fullRefresh) == 1 {
@@ -110,7 +112,7 @@ func updateCache() {
 		} else {
 			persist()
 		}
-
+		atomic.StoreUint32(&fullRefresh, 0)
 		time.Sleep(1 * time.Minute)
 	}
 }
@@ -126,46 +128,56 @@ func fetchNewData(full bool) bool {
 	listFailed = nil
 	listFailedMutex.Unlock()
 
-	// get finished races list
-	log.Println("fetching ethorse bridge archive race list")
-	races, err := fetchArchive()
-	if err != nil {
-		log.Fatal("Error :", err)
-		return false
-	}
-
-	for _, v := range races[:] {
-		number, err := strconv.ParseUint(v.RaceNumber, 10, 32)
+	var races []Race
+	var err error
+	if !full {
+		// get finished races list from ethorse bridge
+		log.Println("fetching ethorse bridge archive race list")
+		races, err = fetchArchive()
 		if err != nil {
 			log.Fatal("Error :", err)
 			return false
 		}
-		if uint64(uint32(number)) != uint64(number) {
-			log.Fatal("Invalid race number")
-			return false
-		}
-		_, exists := RaceCache[uint32(number)]
-		if !exists { //new value
-			log.Println("I dont have this race in cache, try to get it : #", number)
-			wg.Add(1)
-			atomic.AddUint64(&ops, 1)
-			go asyncFetchRaceData(v, uint32(number), node)
-		} else {
-			log.Println("This race is already cached : #", number)
-			then, err := strconv.ParseInt(v.Date, 10, 64)
+		for _, v := range races[:] {
+			number, err := strconv.ParseUint(v.RaceNumber, 10, 32)
 			if err != nil {
 				log.Fatal("Error :", err)
 				return false
 			}
-			elapsed := time.Now().Unix() - then
-			if (elapsed < 48*60*60) || full {
-				log.Println("Get BS data again : #", number)
+			if uint64(uint32(number)) != uint64(number) {
+				log.Fatal("Invalid race number")
+				return false
+			}
+			_, exists := RaceCache[uint32(number)]
+			if !exists { //new value
+				log.Println("I dont have this race in cache, try to get it : #", number)
 				wg.Add(1)
 				atomic.AddUint64(&ops, 1)
-				go asyncUpdateRaceData(uint32(number), full, node)
+				go asyncFetchRaceData(v, uint32(number), node)
+			} else {
+				log.Println("This race is already cached : #", number)
+				then, err := strconv.ParseInt(v.Date, 10, 64)
+				if err != nil {
+					log.Fatal("Error :", err)
+					return false
+				}
+				elapsed := time.Now().Unix() - then
+				if (elapsed < 48*60*60) || full {
+					log.Println("Get BS data again : #", number)
+					wg.Add(1)
+					atomic.AddUint64(&ops, 1)
+					go asyncUpdateRaceData(uint32(number), full, node)
+				}
 			}
-		}
 
+		}
+	} else {
+		//its a full refresh, we reload all race data from blockchain
+		for _, value := range RaceCache {
+			wg.Add(1)
+			atomic.AddUint64(&ops, 1)
+			go asyncUpdateRaceData(value.RaceNumber, true, node)
+		}
 	}
 
 	wg.Wait()
