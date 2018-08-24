@@ -178,6 +178,7 @@ func fetchNewData(full bool) bool {
 			atomic.AddUint64(&ops, 1)
 			go asyncUpdateRaceData(value.RaceNumber, true, node)
 		}
+		atomic.StoreUint32(&saveNeeded, 1) //always save
 	}
 
 	wg.Wait()
