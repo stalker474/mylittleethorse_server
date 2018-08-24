@@ -249,7 +249,7 @@ func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 		race.Volume += v.Value
 	}
 
-	race.Refunded = (race.Volume == 0) || (race.WinnerHorses == nil)
+	race.Refunded = (race.Volume == 0) || (race.WinnerHorses == nil) || (len(race.Bets) == 1)
 
 	return changed, nil
 }
