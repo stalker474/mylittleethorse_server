@@ -155,7 +155,6 @@ func fetchNewData(full bool) bool {
 				atomic.AddUint64(&ops, 1)
 				go asyncFetchRaceData(v, uint32(number), node)
 			} else {
-				log.Println("This race is already cached : #", number)
 				then, err := strconv.ParseInt(v.Date, 10, 64)
 				if err != nil {
 					log.Fatal("Error :", err)
@@ -174,13 +173,12 @@ func fetchNewData(full bool) bool {
 	} else {
 		//its a full refresh, we reload all race data from blockchain
 		for _, value := range RaceCache {
-			wg.Add(1)
 			atomic.AddUint64(&ops, 1)
 			go asyncUpdateRaceData(value.RaceNumber, true, node)
 		}
 		atomic.StoreUint32(&saveNeeded, 1) //always save
 	}
-
+	wg.Add(len(RaceCache))
 	wg.Wait()
 	log.Println("DONE")
 

@@ -203,7 +203,7 @@ func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 		race.WinnerHorses = append(race.WinnerHorses, "ETH")
 	}
 
-	withdraws, err := contract.BettingFilterer.FilterWithdraw(&bind.FilterOpts{6059602, nil, nil})
+	withdraws, err := contract.BettingFilterer.FilterWithdraw(&bind.FilterOpts{5000000, nil, nil})
 	if err != nil {
 		return false, err
 	}
