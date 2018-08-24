@@ -182,7 +182,7 @@ func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 		}
 		var newBets []Bet
 		for deposits.Next() {
-			newBets = append(newBets, Bet{WeiToEth(deposits.Event.Value), FromBytes32(deposits.Event.Horse), deposits.Event.From.Hex()})
+			newBets = append(newBets, Bet{WeiToEth(deposits.Event.Value), FromBytes32(deposits.Event.Horse)[0:3], deposits.Event.From.Hex()})
 		}
 		race.Bets = newBets
 		changed = true
