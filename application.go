@@ -119,7 +119,7 @@ func updateCache() {
 		if !fetchNewData(false) {
 			log.Println("No changes...")
 		} else {
-
+			persist()
 		}
 		atomic.StoreUint32(&fullRefresh, 0)
 		time.Sleep(time.Duration(refreshRate) * time.Second)
