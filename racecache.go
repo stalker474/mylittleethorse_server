@@ -232,7 +232,7 @@ func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 	}
 	withdraws.Close()
 
-	if len(newWithdraws) != len(race.Withdraws) {
+	if len(newWithdraws) > 0 && (len(newWithdraws) != len(race.Withdraws)) {
 		race.Withdraws = newWithdraws
 		changed = true
 	}
