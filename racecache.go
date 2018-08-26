@@ -155,9 +155,9 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	}
 	data.RaceNumber = uint32(raceNumber)
 
-	updateRaceData(&data, true, node)
+	_, err = updateRaceData(&data, true, node)
 
-	return data, nil
+	return data, err
 }
 
 func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
@@ -171,6 +171,14 @@ func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 		return false, err
 	}
 
+	c, err := contract.Chronus(nil)
+	if err != nil {
+		return false, err
+	}
+	if c.BettingDuration > 0 {
+		log.Println("DATAAAAAAAA ", c.BettingDuration)
+	}
+
 	btcWon, err := contract.WinnerHorse(nil, ToBytes32("BTC"))
 	if err != nil {
 		return false, err
@@ -182,14 +190,6 @@ func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 	ethWon, err := contract.WinnerHorse(nil, ToBytes32("ETH"))
 	if err != nil {
 		return false, err
-	}
-
-	c, err := contract.Chronus(nil)
-	if err != nil {
-		return false, err
-	}
-	if c.BettingDuration > 0 {
-		log.Println("DATAAAAAAAA ", c.BettingDuration)
 	}
 
 	if full { //only fetch deposits during full update
