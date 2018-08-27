@@ -1,20 +1,20 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 var node *Node
-var db Database
+var db *PersistObject
 
 var ops uint64
 var fullRefresh uint32
@@ -31,80 +31,25 @@ func main() {
 	if port == "" {
 		port = "5000"
 	}
-
+	var server Server
+	db := NewPersistObject()
 	var err error
+
 	node, err = NewNode("https://mainnet.infura.io")
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
 	}
-	RaceCache = make(map[uint32]RaceData)
-	err = db.Load()
-	if err != nil {
+
+	if db.load() != nil {
 		log.Println("Failed to fetch database, creating one : ", err)
 		log.Println("fetching new data for the first time")
 	}
 
 	log.Println("starting updating loop")
 	go updateCache()
+
 	log.Println("starting api on port ", port)
-
-	http.HandleFunc("/api/json", func(w http.ResponseWriter, r *http.Request) {
-		enableCors(&w)
-		_, zipped := r.URL.Query()["gz"]
-		if zipped {
-			fmt.Fprintln(w, RaceCacheString.GetZIP())
-		} else {
-			fmt.Fprintln(w, RaceCacheString.GetJSON())
-		}
-
-	})
-
-	http.HandleFunc("/api/csv", func(w http.ResponseWriter, r *http.Request) {
-		enableCors(&w)
-		fmt.Fprintln(w, RaceCacheString.GetCSV())
-	})
-
-	http.HandleFunc("/api/admin", func(w http.ResponseWriter, r *http.Request) {
-		enableCors(&w)
-		keys, ok := r.URL.Query()["method"]
-
-		if !ok || len(keys[0]) < 1 {
-			fmt.Fprintln(w, "Missing method")
-			fmt.Fprintln(w, "updatedb : refreshes json cache data from current state")
-			fmt.Fprintln(w, "recache : refresh ALL data keeping only old ethorse bridge info")
-			fmt.Fprintln(w, "report : gives info about current update status")
-			return
-		}
-
-		switch keys[0] {
-		case "updatedb":
-			db.Save()
-			fmt.Fprintln(w, "Recached")
-			return
-		case "recache":
-			atomic.StoreUint32(&fullRefresh, 1)
-			fmt.Fprintln(w, "Full recache ordered")
-			return
-		case "report":
-			listFailedMutex.Lock()
-			res, _ := json.Marshal(listFailed)
-			listFailedMutex.Unlock()
-			fmt.Fprintln(w, "Failed races:"+string(res))
-
-			fmt.Fprintln(w, "Left to process: ", atomic.LoadUint64(&ops))
-			return
-		default:
-			fmt.Fprintln(w, "Unknown method")
-		}
-	})
-
-	log.Fatal(http.ListenAndServe(":"+port, nil))
-}
-
-func enableCors(w *http.ResponseWriter) {
-	(*w).Header().Set("Access-Control-Allow-Origin", "*")
-	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
-	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+	server.Serve(port)
 }
 
 func updateCache() {
@@ -121,13 +66,12 @@ func updateCache() {
 		} else {
 			persist()
 		}
-		atomic.StoreUint32(&fullRefresh, 0)
 		time.Sleep(time.Duration(refreshRate) * time.Second)
 	}
 }
 
 func persist() {
-	db.Save()
+	db.save()
 	log.Println("Cache Updated")
 }
 
@@ -157,8 +101,8 @@ func fetchNewData(full bool) bool {
 				log.Fatal("Invalid race number")
 				return false
 			}
-			_, exists := RaceCache[uint32(number)]
-			if !exists { //new value
+
+			if !db.contains(uint32(number)) { //new value
 				log.Println("I dont have this race in cache, try to get it : #", number)
 				wg.Add(1)
 				atomic.AddUint64(&ops, 1)
@@ -180,10 +124,10 @@ func fetchNewData(full bool) bool {
 
 		}
 	} else {
-		wg.Add(len(RaceCache))
-		atomic.AddUint64(&ops, uint64(len(RaceCache)))
+		wg.Add(len(db.racesData))
+		atomic.AddUint64(&ops, uint64(len(db.racesData)))
 		//its a full refresh, we reload all race data from blockchain
-		for _, value := range RaceCache {
+		for _, value := range db.racesData {
 			go asyncUpdateRaceData(value.RaceNumber, true, node)
 		}
 		atomic.StoreUint32(&saveNeeded, 1) //always save
@@ -214,7 +158,7 @@ func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
 		retry++
 	}
 
-	RaceCache[raceNumber] = newRaceData
+	db.racesData[raceNumber] = newRaceData
 	atomic.AddUint64(&ops, ^uint64(0))
 	log.Println("Success: ", raceNumber)
 
@@ -223,7 +167,7 @@ func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
 
 func asyncUpdateRaceData(raceNumber uint32, full bool, node *Node) {
 	defer wg.Done()
-	race, _ := RaceCache[raceNumber]
+	race, _ := db.racesData[raceNumber]
 	retry := 0
 	err := errors.New("")
 	changed := false
@@ -242,10 +186,136 @@ func asyncUpdateRaceData(raceNumber uint32, full bool, node *Node) {
 		retry++
 	}
 
-	RaceCache[raceNumber] = race
+	db.racesData[raceNumber] = race
 	atomic.AddUint64(&ops, ^uint64(0))
 	log.Println("Success: ", raceNumber, " value:", atomic.LoadUint64(&ops))
 	if changed {
 		atomic.StoreUint32(&saveNeeded, 1)
 	}
+}
+
+func fetchRaceData(race *Race, node *Node) (RaceData, error) {
+	data := RaceData{}
+	var err error
+
+	data.ContractID = race.ContractID
+	data.Date, err = strconv.ParseUint(race.Date, 10, 64)
+	if err != nil {
+		return data, err
+	}
+	data.RaceDuration, err = strconv.ParseUint(race.RaceDuration, 10, 64)
+	if err != nil {
+		return data, err
+	}
+	data.BettingDuration, err = strconv.ParseUint(race.BettingDuration, 10, 64)
+	if err != nil {
+		return data, err
+	}
+	data.EndTime, err = strconv.ParseUint(race.EndTime, 10, 64)
+	if err != nil {
+		return data, err
+	}
+	raceNumber, err := strconv.ParseUint(race.RaceNumber, 10, 32)
+	if err != nil {
+		return data, err
+	}
+	data.RaceNumber = uint32(raceNumber)
+
+	_, err = updateRaceData(&data, true, node)
+
+	return data, err
+}
+
+func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
+	var err error
+
+	changed := false
+
+	// Instantiate the contract and display its name
+	contract, err := NewBetting(common.HexToAddress(race.ContractID), node.Conn)
+	if err != nil {
+		return false, err
+	}
+
+	btcWon, err := contract.WinnerHorse(nil, ToBytes32("BTC"))
+	if err != nil {
+		return false, err
+	}
+	ltcWon, err := contract.WinnerHorse(nil, ToBytes32("LTC"))
+	if err != nil {
+		return false, err
+	}
+	ethWon, err := contract.WinnerHorse(nil, ToBytes32("ETH"))
+	if err != nil {
+		return false, err
+	}
+
+	if full { //only fetch deposits during full update
+		deposits, err := contract.BettingFilterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+		if err != nil {
+			return false, err
+		}
+		var newBets []Bet
+		for deposits.Next() {
+			newBets = append(newBets, Bet{WeiToEth(deposits.Event.Value), FromBytes32(deposits.Event.Horse)[0:3], deposits.Event.From.Hex()})
+		}
+		race.Bets = newBets
+		changed = true
+		deposits.Close()
+	}
+
+	if btcWon || ltcWon || ethWon {
+		race.WinnerHorses = nil
+	}
+
+	if btcWon {
+		race.WinnerHorses = append(race.WinnerHorses, "BTC")
+	}
+	if ltcWon {
+		race.WinnerHorses = append(race.WinnerHorses, "LTC")
+	}
+	if ethWon {
+		race.WinnerHorses = append(race.WinnerHorses, "ETH")
+	}
+
+	withdraws, err := contract.BettingFilterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	if err != nil {
+		return false, err
+	}
+
+	var newWithdraws []Withdraw
+
+	for withdraws.Next() {
+		newWithdraws = append(newWithdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
+	}
+	withdraws.Close()
+
+	if len(newWithdraws) > 0 && (len(newWithdraws) != len(race.Withdraws)) {
+		race.Withdraws = newWithdraws
+		changed = true
+	}
+
+	playersMap := make(map[string]bool)
+
+	for _, v := range race.Withdraws[:] {
+		playersMap[v.To] = true
+	}
+
+	race.Volume = 0
+	for _, v := range race.Bets[:] {
+		race.Volume += v.Value
+	}
+
+	refunds, err := contract.BettingFilterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	if err != nil {
+		return false, err
+	}
+
+	race.Refunded = false
+	//if refunds was triggered, this will contain a single RefundEnabled event
+	for refunds.Next() {
+		race.Refunded = true
+	}
+
+	return changed, nil
 }
