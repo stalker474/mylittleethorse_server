@@ -5,7 +5,6 @@ import (
 	"compress/zlib"
 	"encoding/csv"
 	"encoding/json"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -171,14 +170,6 @@ func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 		return false, err
 	}
 
-	c, err := contract.Chronus(nil)
-	if err != nil {
-		return false, err
-	}
-	if c.BettingDuration > 0 {
-		log.Println("DATAAAAAAAA ", c.BettingDuration)
-	}
-
 	btcWon, err := contract.WinnerHorse(nil, ToBytes32("BTC"))
 	if err != nil {
 		return false, err
@@ -193,7 +184,7 @@ func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 	}
 
 	if full { //only fetch deposits during full update
-		deposits, err := contract.BettingFilterer.FilterDeposit(&bind.FilterOpts{5000000, nil, nil})
+		deposits, err := contract.BettingFilterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 		if err != nil {
 			return false, err
 		}
@@ -220,7 +211,7 @@ func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 		race.WinnerHorses = append(race.WinnerHorses, "ETH")
 	}
 
-	withdraws, err := contract.BettingFilterer.FilterWithdraw(&bind.FilterOpts{5000000, nil, nil})
+	withdraws, err := contract.BettingFilterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	if err != nil {
 		return false, err
 	}
@@ -244,17 +235,20 @@ func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 	}
 
 	race.Volume = 0
-	somebodyWon := false
-	winners := strings.Join(race.WinnerHorses, "")
-	//if all people who played withdrew, its a refunded race
 	for _, v := range race.Bets[:] {
 		race.Volume += v.Value
-		if strings.Contains(winners, v.Horse) {
-			somebodyWon = true
-		}
 	}
 
-	race.Refunded = (race.Volume == 0) || (race.WinnerHorses == nil) || (len(race.Bets) == 1) || (!somebodyWon)
+	refunds, err := contract.BettingFilterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	if err != nil {
+		return false, err
+	}
+
+	race.Refunded = false
+	//if refunds was triggered, this will contain a single RefundEnabled event
+	for refunds.Next() {
+		race.Refunded = true
+	}
 
 	return changed, nil
 }
