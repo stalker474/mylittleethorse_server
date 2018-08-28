@@ -51,6 +51,7 @@ type RaceData struct {
 	BettingDuration uint64     `json:"betting_duration"`
 	EndTime         uint64     `json:"end_time"`
 	RaceNumber      uint32     `json:"race_number"`
+	Version         uint32     `json:"version"`
 	WinnerHorses    []string   `json:"winner_horses"`
 	Bets            []Bet      `json:"bets"`
 	Withdraws       []Withdraw `json:"withdraws"`
@@ -102,6 +103,29 @@ func (p *PersistObject) contains(raceNumber uint32) bool {
 func (p *PersistObject) toJSON(from uint32, to uint32) (s string, err error) {
 	p.mux.Lock()
 	data, err := json.Marshal(NewCache(p.racesData, from, to))
+	p.mux.Unlock()
+
+	s = string(data)
+	return s, err
+}
+
+func (p *PersistObject) toLightJSON() (s string, err error) {
+	p.mux.Lock()
+
+	var r []Race
+	for _, value := range p.racesData {
+		r = append(r, Race{
+			ContractID:      value.ContractID,
+			Date:            value.Date,
+			RaceDuration:    value.RaceDuration,
+			BettingDuration: value.BettingDuration,
+			EndTime:         value.EndTime,
+			RaceNumber:      value.RaceNumber,
+			V:               value.Version,
+			Active:          "Closed"})
+	}
+
+	data, err := json.Marshal(r)
 	p.mux.Unlock()
 
 	s = string(data)

@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"os"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -84,7 +83,7 @@ func fetchNewData(full bool) bool {
 			return false
 		}
 		for _, v := range races[:] {
-			number, err := strconv.ParseUint(v.RaceNumber, 10, 32)
+			number := v.RaceNumber
 			if err != nil {
 				log.Fatal("Error :", err)
 				return false
@@ -100,12 +99,7 @@ func fetchNewData(full bool) bool {
 				atomic.AddUint64(&ops, 1)
 				go asyncFetchRaceData(v, uint32(number), node)
 			} else {
-				then, err := strconv.ParseInt(v.Date, 10, 64)
-				if err != nil {
-					log.Fatal("Error :", err)
-					return false
-				}
-				elapsed := time.Now().Unix() - then
+				elapsed := time.Now().Unix() - int64(v.Date)
 				if (elapsed < 48*60*60) || full {
 					log.Println("Get BS data again : #", number)
 					wg.Add(1)
@@ -171,27 +165,12 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	var err error
 
 	data.ContractID = race.ContractID
-	data.Date, err = strconv.ParseUint(race.Date, 10, 64)
-	if err != nil {
-		return data, err
-	}
-	data.RaceDuration, err = strconv.ParseUint(race.RaceDuration, 10, 64)
-	if err != nil {
-		return data, err
-	}
-	data.BettingDuration, err = strconv.ParseUint(race.BettingDuration, 10, 64)
-	if err != nil {
-		return data, err
-	}
-	data.EndTime, err = strconv.ParseUint(race.EndTime, 10, 64)
-	if err != nil {
-		return data, err
-	}
-	raceNumber, err := strconv.ParseUint(race.RaceNumber, 10, 32)
-	if err != nil {
-		return data, err
-	}
-	data.RaceNumber = uint32(raceNumber)
+	data.Date = race.Date
+	data.RaceDuration = race.RaceDuration
+	data.BettingDuration = race.BettingDuration
+	data.EndTime = race.EndTime
+	data.RaceNumber = race.RaceNumber
+	data.Version = race.V
 
 	_, err = updateRaceData(&data, node)
 

@@ -10,14 +10,13 @@ var endpointArchive = "https://bet.ethorse.com/bridge/getHistoricRaces"
 
 // Race blabla
 type Race struct {
-	ID              string `json:"_id"`
 	ContractID      string `json:"contractid"`
-	Date            string `json:"date"`
-	RaceDuration    string `json:"race_duration"`
-	BettingDuration string `json:"betting_duration"`
-	EndTime         string `json:"end_time"`
-	RaceNumber      string `json:"race_number"`
-	V               int    `json:"__v"`
+	Date            uint64 `json:"date"`
+	RaceDuration    uint64 `json:"race_duration"`
+	BettingDuration uint64 `json:"betting_duration"`
+	EndTime         uint64 `json:"end_time"`
+	RaceNumber      uint32 `json:"race_number"`
+	V               uint32 `json:"__v"`
 	Active          string `json:"active"`
 }
 

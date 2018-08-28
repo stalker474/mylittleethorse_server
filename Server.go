@@ -67,6 +67,16 @@ func (s *Server) Serve(port string) error {
 		}
 	})
 
+	http.HandleFunc("/api/bridgeData", func(w http.ResponseWriter, r *http.Request) {
+		enableCors(&w)
+		data, err := s.data.toLightJSON()
+		if err != nil {
+			fmt.Fprintln(w, err.Error())
+		} else {
+			fmt.Fprintln(w, string(data))
+		}
+	})
+
 	http.HandleFunc("/api/zjson", func(w http.ResponseWriter, r *http.Request) {
 		enableCors(&w)
 		from, to, err := getFromAndTo(r)
