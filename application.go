@@ -182,12 +182,25 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	if err != nil {
 		return data, err
 	}
+	raceDuration, err := strconv.Atoi(race.RaceDuration)
+	if err != nil {
+		return data, err
+	}
+	bettingDuration, err := strconv.Atoi(race.BettingDuration)
+	if err != nil {
+		return data, err
+	}
+	endTime, err := strconv.Atoi(race.EndTime)
+	if err != nil {
+		return data, err
+	}
+
 	data.Date = uint64(date)
-	data.RaceDuration = race.RaceDuration
-	data.BettingDuration = race.BettingDuration
-	data.EndTime = race.EndTime
+	data.RaceDuration = uint64(raceDuration)
+	data.BettingDuration = uint64(bettingDuration)
+	data.EndTime = uint64(endTime)
 	data.RaceNumber = uint32(raceNumber)
-	data.Version = strconv.Itoa(race.V)
+	data.Version = uint64(race.V)
 	data.Active = race.Active
 
 	_, err = updateRaceData(&data, node)
