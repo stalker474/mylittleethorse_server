@@ -66,6 +66,7 @@ func updateCache() {
 
 func persist() {
 	server.data.save()
+	server.resetCache()
 	log.Println("Cache Updated")
 }
 

@@ -9,20 +9,30 @@ import (
 
 // Server Represents our api server
 type Server struct {
-	data *PersistObject
+	data  *PersistObject
+	cache map[string]string
 }
 
 // NewServer blabla
 func NewServer() (s *Server) {
 	s = new(Server)
 	s.data = NewPersistObject()
+	s.resetCache()
 	return s
+}
+
+func (s *Server) resetCache() {
+	s.cache = make(map[string]string)
 }
 
 func enableCors(w *http.ResponseWriter) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
 	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
 	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+}
+
+func enableDecorators(w *http.ResponseWriter) {
+	(*w).Header().Set("Content-Type", "text/plain")
 }
 
 func getFromAndTo(r *http.Request) (from uint32, to uint32, err error) {
@@ -54,58 +64,91 @@ func getFromAndTo(r *http.Request) (from uint32, to uint32, err error) {
 // Serve start the server on port port
 func (s *Server) Serve(port string) error {
 	http.HandleFunc("/api/json", func(w http.ResponseWriter, r *http.Request) {
+		enableDecorators(&w)
 		enableCors(&w)
 		from, to, err := getFromAndTo(r)
 		if err != nil {
 			fmt.Fprintln(w, err.Error())
 		}
-		data, err := s.data.toJSON(from, to)
-		if err != nil {
-			fmt.Fprintln(w, err.Error())
+		req := "json" + strconv.Itoa(int(from)) + "_" + strconv.Itoa(int(to))
+		_, exists := s.cache[req]
+		if exists {
+			fmt.Fprintln(w, s.cache[req])
 		} else {
-			fmt.Fprintln(w, string(data))
+			data, err := s.data.toJSON(from, to)
+			if err != nil {
+				fmt.Fprintln(w, err.Error())
+			} else {
+				fmt.Fprintln(w, string(data))
+				s.cache[req] = string(data)
+			}
 		}
 	})
 
-	http.HandleFunc("/api/bridgeData", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/api/bridge", func(w http.ResponseWriter, r *http.Request) {
+		enableDecorators(&w)
 		enableCors(&w)
-		data, err := s.data.toLightJSON()
-		if err != nil {
-			fmt.Fprintln(w, err.Error())
+		req := "bridge"
+		_, exists := s.cache[req]
+		if exists {
+			fmt.Fprintln(w, s.cache[req])
 		} else {
-			fmt.Fprintln(w, string(data))
+			data, err := s.data.toLightJSON()
+			if err != nil {
+				fmt.Fprintln(w, err.Error())
+			} else {
+				fmt.Fprintln(w, string(data))
+				s.cache[req] = string(data)
+			}
 		}
 	})
 
 	http.HandleFunc("/api/zjson", func(w http.ResponseWriter, r *http.Request) {
+		enableDecorators(&w)
 		enableCors(&w)
 		from, to, err := getFromAndTo(r)
 		if err != nil {
 			fmt.Fprintln(w, err.Error())
 		}
-		data, err := s.data.toZJSON(from, to)
-		if err != nil {
-			fmt.Fprintln(w, err.Error())
+		req := "zjson" + strconv.Itoa(int(from)) + "_" + strconv.Itoa(int(to))
+		_, exists := s.cache[req]
+		if exists {
+			fmt.Fprintln(w, s.cache[req])
 		} else {
-			fmt.Fprintln(w, string(data))
+			data, err := s.data.toZJSON(from, to)
+			if err != nil {
+				fmt.Fprintln(w, err.Error())
+			} else {
+				fmt.Fprintln(w, string(data))
+				s.cache[req] = string(data)
+			}
 		}
 	})
 
 	http.HandleFunc("/api/csv", func(w http.ResponseWriter, r *http.Request) {
+		enableDecorators(&w)
 		enableCors(&w)
 		from, to, err := getFromAndTo(r)
 		if err != nil {
 			fmt.Fprintln(w, err.Error())
 		}
-		data, err := s.data.toCSV(from, to)
-		if err != nil {
-			fmt.Fprintln(w, err.Error())
+		req := "zjson" + strconv.Itoa(int(from)) + "_" + strconv.Itoa(int(to))
+		_, exists := s.cache[req]
+		if exists {
+			fmt.Fprintln(w, s.cache[req])
 		} else {
-			fmt.Fprintln(w, string(data))
+			data, err := s.data.toCSV(from, to)
+			if err != nil {
+				fmt.Fprintln(w, err.Error())
+			} else {
+				fmt.Fprintln(w, string(data))
+				s.cache[req] = string(data)
+			}
 		}
 	})
 
 	http.HandleFunc("/api/admin", func(w http.ResponseWriter, r *http.Request) {
+		enableDecorators(&w)
 		enableCors(&w)
 		keys, ok := r.URL.Query()["method"]
 
@@ -134,5 +177,5 @@ func (s *Server) Serve(port string) error {
 		}
 	})
 
-	return http.ListenAndServe(":"+port, nil)
+	return http.ListenAndServeTLS(":"+port, "server.rsa.crt", "server.rsa.key", nil)
 }
