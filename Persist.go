@@ -57,6 +57,7 @@ type RaceData struct {
 	Withdraws       []Withdraw `json:"withdraws"`
 	Volume          float32    `json:"volume"`
 	Refunded        bool       `json:"refunded"`
+	Active          string     `json:"active"`
 }
 
 // Cache blabla

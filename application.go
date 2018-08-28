@@ -172,6 +172,7 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	data.EndTime = race.EndTime
 	data.RaceNumber = race.RaceNumber
 	data.Version = race.V
+	data.Active = race.Active
 
 	_, err = updateRaceData(&data, node)
 
