@@ -79,8 +79,9 @@ func (s *Server) Serve(port string) error {
 			if err != nil {
 				fmt.Fprintln(w, err.Error())
 			} else {
-				fmt.Fprintln(w, string(data))
-				s.cache[req] = string(data)
+				str := string(data[:])
+				fmt.Fprintln(w, str)
+				s.cache[req] = str
 			}
 		}
 	})
@@ -97,8 +98,9 @@ func (s *Server) Serve(port string) error {
 			if err != nil {
 				fmt.Fprintln(w, err.Error())
 			} else {
-				fmt.Fprintln(w, string(data))
-				s.cache[req] = string(data)
+				str := string(data[:])
+				fmt.Fprintln(w, str)
+				s.cache[req] = str
 			}
 		}
 	})
@@ -119,8 +121,9 @@ func (s *Server) Serve(port string) error {
 			if err != nil {
 				fmt.Fprintln(w, err.Error())
 			} else {
-				fmt.Fprintln(w, string(data))
-				s.cache[req] = string(data)
+				str := string(data[:])
+				fmt.Fprintln(w, str)
+				s.cache[req] = str
 			}
 		}
 	})
@@ -141,8 +144,9 @@ func (s *Server) Serve(port string) error {
 			if err != nil {
 				fmt.Fprintln(w, err.Error())
 			} else {
-				fmt.Fprintln(w, string(data))
-				s.cache[req] = string(data)
+				str := string(data[:])
+				fmt.Fprintln(w, str)
+				s.cache[req] = str
 			}
 		}
 	})

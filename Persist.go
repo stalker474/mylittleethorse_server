@@ -103,7 +103,7 @@ func (p *PersistObject) toJSON(from uint32, to uint32) (s string, err error) {
 	data, err := json.Marshal(NewCache(p.racesData, from, to))
 	p.mux.Unlock()
 
-	s = string(data)
+	s = string(data[:])
 	return s, err
 }
 
@@ -129,7 +129,7 @@ func (p *PersistObject) toLightJSON() (s string, err error) {
 	}
 	p.mux.Unlock()
 
-	s = string(data)
+	s = string(data[:])
 	return s, err
 }
 
@@ -140,7 +140,7 @@ func (p *PersistObject) toZJSON(from uint32, to uint32) (s string, err error) {
 	w.Write([]byte(data))
 	w.Close()
 
-	s = string(data)
+	s = string(data[:])
 	return s, err
 }
 

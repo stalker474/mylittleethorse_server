@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"log"
 	"os"
 	"strconv"
@@ -107,7 +109,7 @@ func fetchNewData(full bool) bool {
 				go asyncFetchRaceData(v, uint32(number), node)
 			} else {
 				elapsed := time.Now().Unix() - int64(date)
-				if (elapsed < 48*60*60) || full {
+				if (elapsed < 2*48*60*60) || full {
 					log.Println("Get BS data again : #", number)
 					wg.Add(1)
 					atomic.AddUint64(&ops, 1)
@@ -213,6 +215,11 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 func updateRaceData(race *RaceData, node *Node) (bool, error) {
 	var err error
 
+	original, err := json.Marshal(race)
+	if err != nil {
+		return false, err
+	}
+
 	// Instantiate the contract and display its name
 	contract, err := NewBetting(common.HexToAddress(race.ContractID), node.Conn)
 	if err != nil {
@@ -259,10 +266,6 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 			queries["Refund"] = (err == nil)
 		}
 
-		prevLenBets := len(race.Bets)
-		prevLenWithdraws := len(race.Withdraws)
-		prevLenWinners := len(race.WinnerHorses)
-
 		if btcWon || ltcWon || ethWon {
 			race.WinnerHorses = nil
 		}
@@ -302,10 +305,20 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 
 		if queries["Refund"] && (refunds != nil) {
 			race.Refunded = refunds.Next()
-		}
+			if race.Refunded {
+				refunds.Close()
+			}
 
-		changed = (prevLenBets != len(race.Bets)) || (prevLenWithdraws != len(race.Withdraws)) || (prevLenWinners != len(race.WinnerHorses))
+			refunds = nil
+		}
 	}
+
+	now, err := json.Marshal(race)
+	if err != nil {
+		return false, err
+	}
+
+	changed = !bytes.Equal(now, original)
 
 	return changed, nil
 }
