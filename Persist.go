@@ -22,6 +22,8 @@ func (a ByRaceNumber) Len() int           { return len(a) }
 func (a ByRaceNumber) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByRaceNumber) Less(i, j int) bool { return a[i].RaceNumber > a[j].RaceNumber }
 
+var lastUpdate int64
+
 // PersistObject blabla
 type PersistObject struct {
 	racesData map[uint32]RaceData
@@ -71,11 +73,12 @@ func NewPersistObject() (p *PersistObject) {
 
 // Save blabla
 func (p *PersistObject) save() error {
-	cache := NewCache(p.racesData)
+	cache := NewCache(p.racesData, 0, 99999)
 	resp, err := json.Marshal(cache)
 	if err != nil {
 		return err
 	}
+	lastUpdate = time.Now().Unix()
 	return ioutil.WriteFile(tempDbFile, resp, 0644)
 }
 
@@ -96,19 +99,19 @@ func (p *PersistObject) contains(raceNumber uint32) bool {
 	return exists
 }
 
-func (p *PersistObject) toJSON() (s string, err error) {
+func (p *PersistObject) toJSON(from uint32, to uint32) (s string, err error) {
 	p.mux.Lock()
-	data, err := json.Marshal(NewCache(p.racesData))
+	data, err := json.Marshal(NewCache(p.racesData, from, to))
 	p.mux.Unlock()
 
 	s = string(data)
 	return s, err
 }
 
-func (p *PersistObject) toZJSON() (s string, err error) {
+func (p *PersistObject) toZJSON(from uint32, to uint32) (s string, err error) {
 	var b bytes.Buffer
 	w := zlib.NewWriter(&b)
-	data, err := p.toJSON()
+	data, err := p.toJSON(from, to)
 	w.Write([]byte(data))
 	w.Close()
 
@@ -116,12 +119,12 @@ func (p *PersistObject) toZJSON() (s string, err error) {
 	return s, err
 }
 
-func (p *PersistObject) toCSV() (s string, err error) {
+func (p *PersistObject) toCSV(from uint32, to uint32) (s string, err error) {
 	records := [][]string{
 		{"race_number", "date", "race_duration", "betting_duration", "end_time", "winner_horses", "volume", "refunded"},
 	}
 	p.mux.Lock()
-	cache := NewCache(p.racesData)
+	cache := NewCache(p.racesData, from, to)
 	p.mux.Unlock()
 	for _, v := range cache.List {
 		var strs []string
@@ -145,12 +148,14 @@ func (p *PersistObject) toCSV() (s string, err error) {
 }
 
 // NewCache blabla
-func NewCache(m map[uint32]RaceData) (cache *Cache) {
+func NewCache(m map[uint32]RaceData, from uint32, to uint32) (cache *Cache) {
 	cache = new(Cache)
 	for _, v := range m {
-		cache.List = append(cache.List, v)
+		if (v.RaceNumber >= from) && (v.RaceNumber <= to) {
+			cache.List = append(cache.List, v)
+		}
 	}
-	cache.LastUpdate = time.Now().Unix()
+	cache.LastUpdate = lastUpdate
 	sort.Sort(ByRaceNumber(cache.List))
 
 	return cache

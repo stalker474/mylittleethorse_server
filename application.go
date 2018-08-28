@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"log"
 	"os"
 	"strconv"
@@ -14,25 +13,21 @@ import (
 )
 
 var node *Node
-var db *PersistObject
+var server *Server
 
 var ops uint64
 var fullRefresh uint32
-var refreshRate int64 = 10
+var refreshRate int64 = 60
 
 var wg sync.WaitGroup
 var saveNeeded uint32
-
-var listFailedMutex sync.Mutex
-var listFailed []uint32
 
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "5000"
 	}
-	var server Server
-	db := NewPersistObject()
+	server = NewServer()
 	var err error
 
 	node, err = NewNode("https://mainnet.infura.io")
@@ -40,7 +35,7 @@ func main() {
 		log.Fatalf("Failed to init node: %v", err)
 	}
 
-	if db.load() != nil {
+	if server.data.load() != nil {
 		log.Println("Failed to fetch database, creating one : ", err)
 		log.Println("fetching new data for the first time")
 	}
@@ -71,15 +66,12 @@ func updateCache() {
 }
 
 func persist() {
-	db.save()
+	server.data.save()
 	log.Println("Cache Updated")
 }
 
 func fetchNewData(full bool) bool {
 	atomic.StoreUint32(&saveNeeded, 0)
-	listFailedMutex.Lock()
-	listFailed = nil
-	listFailedMutex.Unlock()
 
 	var races []Race
 	var err error
@@ -102,7 +94,7 @@ func fetchNewData(full bool) bool {
 				return false
 			}
 
-			if !db.contains(uint32(number)) { //new value
+			if !server.data.contains(uint32(number)) { //new value
 				log.Println("I dont have this race in cache, try to get it : #", number)
 				wg.Add(1)
 				atomic.AddUint64(&ops, 1)
@@ -118,17 +110,17 @@ func fetchNewData(full bool) bool {
 					log.Println("Get BS data again : #", number)
 					wg.Add(1)
 					atomic.AddUint64(&ops, 1)
-					go asyncUpdateRaceData(uint32(number), full, node)
+					go asyncUpdateRaceData(uint32(number), node)
 				}
 			}
 
 		}
 	} else {
-		wg.Add(len(db.racesData))
-		atomic.AddUint64(&ops, uint64(len(db.racesData)))
+		wg.Add(len(server.data.racesData))
+		atomic.AddUint64(&ops, uint64(len(server.data.racesData)))
 		//its a full refresh, we reload all race data from blockchain
-		for _, value := range db.racesData {
-			go asyncUpdateRaceData(value.RaceNumber, true, node)
+		for _, value := range server.data.racesData {
+			go asyncUpdateRaceData(value.RaceNumber, node)
 		}
 		atomic.StoreUint32(&saveNeeded, 1) //always save
 	}
@@ -141,57 +133,37 @@ func fetchNewData(full bool) bool {
 
 func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
 	defer wg.Done()
-	retry := 0
-	err := errors.New("")
-	var newRaceData RaceData
-	for err != nil {
-		if retry > 5 {
-			log.Println("FAILED COMPLETELY: race #", race.RaceNumber)
-			listFailedMutex.Lock()
-			listFailed = append(listFailed, raceNumber)
-			listFailedMutex.Unlock()
-			atomic.AddUint64(&ops, ^uint64(0))
-			return
-		}
-		log.Println("Failed: race #", race.RaceNumber, " retry :", retry)
-		newRaceData, err = fetchRaceData(&race, node)
-		retry++
+	newRaceData, err := fetchRaceData(&race, node)
+	if err != nil {
+		log.Println("FAILED COMPLETELY: race #", race.RaceNumber)
+	} else {
+		server.data.racesData[raceNumber] = newRaceData
+		log.Println("Success: ", raceNumber)
 	}
 
-	db.racesData[raceNumber] = newRaceData
 	atomic.AddUint64(&ops, ^uint64(0))
-	log.Println("Success: ", raceNumber)
 
 	atomic.StoreUint32(&saveNeeded, 1)
 }
 
-func asyncUpdateRaceData(raceNumber uint32, full bool, node *Node) {
+func asyncUpdateRaceData(raceNumber uint32, node *Node) {
 	defer wg.Done()
-	race, _ := db.racesData[raceNumber]
-	retry := 0
-	err := errors.New("")
-	changed := false
-	for err != nil {
-		if retry > 5 {
-
-			log.Println("FAILED COMPLETELY: race #", race.RaceNumber)
-			listFailedMutex.Lock()
-			listFailed = append(listFailed, raceNumber)
-			listFailedMutex.Unlock()
-			atomic.AddUint64(&ops, ^uint64(0))
-			return
+	race, _ := server.data.racesData[raceNumber]
+	changed, err := updateRaceData(&race, node)
+	if err != nil {
+		log.Println("FAILED COMPLETELY: race #", race.RaceNumber)
+	} else {
+		if changed {
+			server.data.mux.Lock()
+			server.data.racesData[raceNumber] = race
+			server.data.mux.Unlock()
+			atomic.StoreUint32(&saveNeeded, 1)
 		}
-		log.Println("Failed: race #", race.RaceNumber, " retry :", retry)
-		changed, err = updateRaceData(&race, full, node)
-		retry++
+
+		log.Println("Success: ", raceNumber, " value:", atomic.LoadUint64(&ops))
 	}
 
-	db.racesData[raceNumber] = race
 	atomic.AddUint64(&ops, ^uint64(0))
-	log.Println("Success: ", raceNumber, " value:", atomic.LoadUint64(&ops))
-	if changed {
-		atomic.StoreUint32(&saveNeeded, 1)
-	}
 }
 
 func fetchRaceData(race *Race, node *Node) (RaceData, error) {
@@ -221,15 +193,13 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	}
 	data.RaceNumber = uint32(raceNumber)
 
-	_, err = updateRaceData(&data, true, node)
+	_, err = updateRaceData(&data, node)
 
 	return data, err
 }
 
-func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
+func updateRaceData(race *RaceData, node *Node) (bool, error) {
 	var err error
-
-	changed := false
 
 	// Instantiate the contract and display its name
 	contract, err := NewBetting(common.HexToAddress(race.ContractID), node.Conn)
@@ -237,84 +207,92 @@ func updateRaceData(race *RaceData, full bool, node *Node) (bool, error) {
 		return false, err
 	}
 
-	btcWon, err := contract.WinnerHorse(nil, ToBytes32("BTC"))
-	if err != nil {
-		return false, err
-	}
-	ltcWon, err := contract.WinnerHorse(nil, ToBytes32("LTC"))
-	if err != nil {
-		return false, err
-	}
-	ethWon, err := contract.WinnerHorse(nil, ToBytes32("ETH"))
-	if err != nil {
-		return false, err
-	}
+	queries := make(map[string]bool)
 
-	if full { //only fetch deposits during full update
-		deposits, err := contract.BettingFilterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
-		if err != nil {
-			return false, err
+	var btcWon, ltcWon, ethWon bool
+	var deposits *BettingDepositIterator
+	var withdraws *BettingWithdrawIterator
+	var refunds *BettingRefundEnabledIterator
+	changed := false
+
+	for !queries["WinnerHorseBTC"] || !queries["WinnerHorseLTC"] || !queries["WinnerHorseETH"] || !queries["Bets"] || !queries["Withdraws"] || !queries["Refund"] {
+
+		if !queries["WinnerHorseBTC"] {
+			btcWon, err = contract.WinnerHorse(nil, ToBytes32("BTC"))
+			queries["WinnerHorseBTC"] = (err == nil)
 		}
-		var newBets []Bet
-		for deposits.Next() {
-			newBets = append(newBets, Bet{WeiToEth(deposits.Event.Value), FromBytes32(deposits.Event.Horse)[0:3], deposits.Event.From.Hex()})
+
+		if !queries["WinnerHorseLTC"] {
+			ltcWon, err = contract.WinnerHorse(nil, ToBytes32("LTC"))
+			queries["WinnerHorseLTC"] = (err == nil)
 		}
-		race.Bets = newBets
-		changed = true
-		deposits.Close()
-	}
 
-	if btcWon || ltcWon || ethWon {
-		race.WinnerHorses = nil
-	}
+		if !queries["WinnerHorseETH"] {
+			ethWon, err = contract.WinnerHorse(nil, ToBytes32("ETH"))
+			queries["WinnerHorseETH"] = (err == nil)
+		}
 
-	if btcWon {
-		race.WinnerHorses = append(race.WinnerHorses, "BTC")
-	}
-	if ltcWon {
-		race.WinnerHorses = append(race.WinnerHorses, "LTC")
-	}
-	if ethWon {
-		race.WinnerHorses = append(race.WinnerHorses, "ETH")
-	}
+		if !queries["Bets"] {
+			deposits, err = contract.BettingFilterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+			queries["Bets"] = (err == nil)
+		}
 
-	withdraws, err := contract.BettingFilterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
-	if err != nil {
-		return false, err
-	}
+		if !queries["Withdraws"] {
+			withdraws, err = contract.BettingFilterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+			queries["Withdraws"] = (err == nil)
+		}
 
-	var newWithdraws []Withdraw
+		if !queries["Refund"] {
+			refunds, err = contract.BettingFilterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+			queries["Refund"] = (err == nil)
+		}
 
-	for withdraws.Next() {
-		newWithdraws = append(newWithdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
-	}
-	withdraws.Close()
+		prevLenBets := len(race.Bets)
+		prevLenWithdraws := len(race.Withdraws)
+		prevLenWinners := len(race.WinnerHorses)
 
-	if len(newWithdraws) > 0 && (len(newWithdraws) != len(race.Withdraws)) {
-		race.Withdraws = newWithdraws
-		changed = true
-	}
+		if btcWon || ltcWon || ethWon {
+			race.WinnerHorses = nil
+		}
 
-	playersMap := make(map[string]bool)
+		if btcWon {
+			race.WinnerHorses = append(race.WinnerHorses, "BTC")
+		}
+		if ltcWon {
+			race.WinnerHorses = append(race.WinnerHorses, "LTC")
+		}
+		if ethWon {
+			race.WinnerHorses = append(race.WinnerHorses, "ETH")
+		}
 
-	for _, v := range race.Withdraws[:] {
-		playersMap[v.To] = true
-	}
+		if queries["Bets"] && (deposits != nil) {
+			race.Bets = nil
+			for deposits.Next() {
+				race.Bets = append(race.Bets, Bet{WeiToEth(deposits.Event.Value), FromBytes32(deposits.Event.Horse)[0:3], deposits.Event.From.Hex()})
+			}
+			deposits.Close()
+			deposits = nil
 
-	race.Volume = 0
-	for _, v := range race.Bets[:] {
-		race.Volume += v.Value
-	}
+			race.Volume = 0
+			for _, v := range race.Bets {
+				race.Volume += v.Value
+			}
+		}
 
-	refunds, err := contract.BettingFilterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
-	if err != nil {
-		return false, err
-	}
+		if queries["Withdraws"] && (withdraws != nil) {
+			race.Withdraws = nil
+			for withdraws.Next() {
+				race.Withdraws = append(race.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
+			}
+			withdraws.Close()
+			withdraws = nil
+		}
 
-	race.Refunded = false
-	//if refunds was triggered, this will contain a single RefundEnabled event
-	for refunds.Next() {
-		race.Refunded = true
+		if queries["Refunded"] && (refunds != nil) {
+			race.Refunded = refunds.Next()
+		}
+
+		changed = (prevLenBets != len(race.Bets)) || (prevLenWithdraws != len(race.Withdraws)) || (prevLenWinners != len(race.WinnerHorses))
 	}
 
 	return changed, nil
