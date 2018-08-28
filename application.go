@@ -305,9 +305,7 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 
 		if queries["Refund"] && (refunds != nil) {
 			race.Refunded = refunds.Next()
-			if race.Refunded {
-				refunds.Close()
-			}
+			refunds.Close()
 
 			refunds = nil
 		}
