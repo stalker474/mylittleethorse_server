@@ -151,7 +151,9 @@ func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
 
 func asyncUpdateRaceData(raceNumber uint32, node *Node) {
 	defer wg.Done()
+	server.data.mux.Lock()
 	race, _ := server.data.racesData[raceNumber]
+	server.data.mux.Unlock()
 	changed, err := updateRaceData(&race, node)
 	if err != nil {
 		log.Println("FAILED COMPLETELY: race #", race.RaceNumber)
@@ -298,7 +300,7 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 			withdraws = nil
 		}
 
-		if queries["Refunded"] && (refunds != nil) {
+		if queries["Refund"] && (refunds != nil) {
 			race.Refunded = refunds.Next()
 		}
 
