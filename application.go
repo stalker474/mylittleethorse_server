@@ -17,7 +17,7 @@ var server *Server
 
 var ops uint64
 var fullRefresh uint32
-var refreshRate int64 = 10
+var refreshRate int64 = 60
 
 var wg sync.WaitGroup
 var saveNeeded uint32
