@@ -22,8 +22,6 @@ func (a ByRaceNumber) Len() int           { return len(a) }
 func (a ByRaceNumber) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByRaceNumber) Less(i, j int) bool { return a[i].RaceNumber > a[j].RaceNumber }
 
-var lastUpdate int64
-
 // PersistObject blabla
 type PersistObject struct {
 	racesData map[uint32]RaceData
@@ -80,7 +78,6 @@ func (p *PersistObject) save() error {
 	if err != nil {
 		return err
 	}
-	lastUpdate = time.Now().Unix()
 	return ioutil.WriteFile(tempDbFile, resp, 0644)
 }
 
@@ -180,7 +177,7 @@ func NewCache(m map[uint32]RaceData, from uint32, to uint32) (cache *Cache) {
 			cache.List = append(cache.List, v)
 		}
 	}
-	cache.LastUpdate = lastUpdate
+	cache.LastUpdate = time.Now().Unix()
 	sort.Sort(ByRaceNumber(cache.List))
 
 	return cache
