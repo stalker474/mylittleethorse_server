@@ -17,7 +17,7 @@ var server *Server
 
 var ops uint64
 var fullRefresh uint32
-var refreshRate int64 = 60
+var refreshRate int64 = 10
 
 var wg sync.WaitGroup
 var saveNeeded uint32
@@ -187,7 +187,7 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	data.BettingDuration = race.BettingDuration
 	data.EndTime = race.EndTime
 	data.RaceNumber = uint32(raceNumber)
-	data.Version = race.V
+	data.Version = strconv.Itoa(race.V)
 	data.Active = race.Active
 
 	_, err = updateRaceData(&data, node)

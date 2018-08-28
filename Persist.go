@@ -112,6 +112,10 @@ func (p *PersistObject) toLightJSON() (s string, err error) {
 
 	var r []Race
 	for _, value := range p.racesData {
+		version, err := strconv.Atoi(value.Version)
+		if err != nil {
+			return "", err
+		}
 		r = append(r, Race{
 			ContractID:      value.ContractID,
 			Date:            strconv.Itoa(int(value.Date)),
@@ -119,11 +123,14 @@ func (p *PersistObject) toLightJSON() (s string, err error) {
 			BettingDuration: value.BettingDuration,
 			EndTime:         value.EndTime,
 			RaceNumber:      strconv.Itoa(int(value.RaceNumber)),
-			V:               value.Version,
+			V:               version,
 			Active:          "Closed"})
 	}
 
 	data, err := json.Marshal(r)
+	if err != nil {
+		return "", err
+	}
 	p.mux.Unlock()
 
 	s = string(data)
