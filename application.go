@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -83,13 +84,18 @@ func fetchNewData(full bool) bool {
 			log.Fatal("Error :", err)
 			return false
 		}
-		for _, v := range races[:] {
-			number := v.RaceNumber
+		for _, v := range races {
+			number, err := strconv.Atoi(v.RaceNumber)
 			if err != nil {
 				log.Fatal("Error :", err)
 				return false
 			}
-			if uint64(uint32(number)) != uint64(number) {
+			date, err := strconv.Atoi(v.Date)
+			if err != nil {
+				log.Fatal("Error :", err)
+				return false
+			}
+			if int(uint32(number)) != number {
 				log.Fatal("Invalid race number")
 				return false
 			}
@@ -100,7 +106,7 @@ func fetchNewData(full bool) bool {
 				atomic.AddUint64(&ops, 1)
 				go asyncFetchRaceData(v, uint32(number), node)
 			} else {
-				elapsed := time.Now().Unix() - int64(v.Date)
+				elapsed := time.Now().Unix() - int64(date)
 				if (elapsed < 48*60*60) || full {
 					log.Println("Get BS data again : #", number)
 					wg.Add(1)
@@ -132,7 +138,9 @@ func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
 	if err != nil {
 		log.Println("FAILED COMPLETELY: race #", race.RaceNumber)
 	} else {
+		server.data.mux.Lock()
 		server.data.racesData[raceNumber] = newRaceData
+		server.data.mux.Unlock()
 		log.Println("Success: ", raceNumber)
 	}
 
@@ -166,11 +174,19 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	var err error
 
 	data.ContractID = race.ContractID
-	data.Date = race.Date
+	date, err := strconv.Atoi(race.Date)
+	if err != nil {
+		return data, err
+	}
+	raceNumber, err := strconv.Atoi(race.RaceNumber)
+	if err != nil {
+		return data, err
+	}
+	data.Date = uint64(date)
 	data.RaceDuration = race.RaceDuration
 	data.BettingDuration = race.BettingDuration
 	data.EndTime = race.EndTime
-	data.RaceNumber = race.RaceNumber
+	data.RaceNumber = uint32(raceNumber)
 	data.Version = race.V
 	data.Active = race.Active
 

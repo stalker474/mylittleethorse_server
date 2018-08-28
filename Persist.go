@@ -45,11 +45,11 @@ type Withdraw struct {
 type RaceData struct {
 	ContractID      string     `json:"contractid"`
 	Date            uint64     `json:"date"`
-	RaceDuration    uint64     `json:"race_duration"`
-	BettingDuration uint64     `json:"betting_duration"`
-	EndTime         uint64     `json:"end_time"`
+	RaceDuration    string     `json:"race_duration"`
+	BettingDuration string     `json:"betting_duration"`
+	EndTime         string     `json:"end_time"`
 	RaceNumber      uint32     `json:"race_number"`
-	Version         uint32     `json:"version"`
+	Version         string     `json:"version"`
 	WinnerHorses    []string   `json:"winner_horses"`
 	Bets            []Bet      `json:"bets"`
 	Withdraws       []Withdraw `json:"withdraws"`
@@ -114,11 +114,11 @@ func (p *PersistObject) toLightJSON() (s string, err error) {
 	for _, value := range p.racesData {
 		r = append(r, Race{
 			ContractID:      value.ContractID,
-			Date:            value.Date,
+			Date:            strconv.Itoa(int(value.Date)),
 			RaceDuration:    value.RaceDuration,
 			BettingDuration: value.BettingDuration,
 			EndTime:         value.EndTime,
-			RaceNumber:      value.RaceNumber,
+			RaceNumber:      strconv.Itoa(int(value.RaceNumber)),
 			V:               value.Version,
 			Active:          "Closed"})
 	}
@@ -153,9 +153,9 @@ func (p *PersistObject) toCSV(from uint32, to uint32) (s string, err error) {
 		strs = append(strs,
 			strconv.FormatInt(int64(v.RaceNumber), 10),
 			strconv.FormatUint(v.Date, 10),
-			strconv.FormatUint(v.RaceDuration, 10),
-			strconv.FormatUint(v.BettingDuration, 10),
-			strconv.FormatUint(v.EndTime, 10),
+			v.RaceDuration,
+			v.BettingDuration,
+			v.EndTime,
 			strings.Join(v.WinnerHorses[:], "&"),
 			strconv.FormatFloat(float64(v.Volume), 'f', 2, 32),
 			strconv.FormatBool(v.Refunded),
