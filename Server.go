@@ -177,5 +177,7 @@ func (s *Server) Serve(port string) error {
 		}
 	})
 
-	return http.ListenAndServeTLS(":"+port, "server.rsa.crt", "server.rsa.key", nil)
+	//return http.ListenAndServeTLS(":"+port, "server.rsa.crt", "server.rsa.key", nil)
+
+	return http.ListenAndServe(":"+port, nil)
 }
