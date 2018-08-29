@@ -46,7 +46,10 @@ func main() {
 	go updateCache()
 
 	log.Println("starting api on port ", port)
-	server.Serve(port)
+	err = server.Serve(port)
+	if err != nil {
+		log.Println("Failed to start server : ", err)
+	}
 }
 
 func updateCache() {
