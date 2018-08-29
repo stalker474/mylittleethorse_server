@@ -1,1 +1,1 @@
-web: sudo bin/application
+web: bin/application
