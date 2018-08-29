@@ -109,7 +109,7 @@ func fetchNewData(full bool) bool {
 				go asyncFetchRaceData(v, uint32(number), node)
 			} else {
 				elapsed := time.Now().Unix() - int64(date)
-				if (elapsed < 2*48*60*60) || full {
+				if (elapsed < 48*60*60) || full {
 					log.Println("Get BS data again : #", number)
 					wg.Add(1)
 					atomic.AddUint64(&ops, 1)
