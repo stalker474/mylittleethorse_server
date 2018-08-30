@@ -63,7 +63,7 @@ func getFromAndTo(r *http.Request) (from uint32, to uint32, err error) {
 
 // Serve start the server on port port
 func (s *Server) Serve(port string) error {
-	http.HandleFunc("/api/json", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/json", func(w http.ResponseWriter, r *http.Request) {
 		enableDecorators(&w)
 		enableCors(&w)
 		from, to, err := getFromAndTo(r)
@@ -86,7 +86,7 @@ func (s *Server) Serve(port string) error {
 		}
 	})
 
-	http.HandleFunc("/api/bridge", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/bridge", func(w http.ResponseWriter, r *http.Request) {
 		enableDecorators(&w)
 		enableCors(&w)
 		req := "bridge"
@@ -105,7 +105,7 @@ func (s *Server) Serve(port string) error {
 		}
 	})
 
-	http.HandleFunc("/api/zjson", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/zjson", func(w http.ResponseWriter, r *http.Request) {
 		enableDecorators(&w)
 		enableCors(&w)
 		from, to, err := getFromAndTo(r)
@@ -128,7 +128,7 @@ func (s *Server) Serve(port string) error {
 		}
 	})
 
-	http.HandleFunc("/api/csv", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/csv", func(w http.ResponseWriter, r *http.Request) {
 		enableDecorators(&w)
 		enableCors(&w)
 		from, to, err := getFromAndTo(r)
@@ -151,7 +151,7 @@ func (s *Server) Serve(port string) error {
 		}
 	})
 
-	http.HandleFunc("/api/admin", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
 		enableDecorators(&w)
 		enableCors(&w)
 		keys, ok := r.URL.Query()["method"]
