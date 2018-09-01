@@ -313,7 +313,7 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 			refunds = nil
 		}
 
-		if race.Bets == nil {
+		if race.Bets == nil || race.WinnerHorses == nil {
 			race.Refunded = true
 		}
 	}
