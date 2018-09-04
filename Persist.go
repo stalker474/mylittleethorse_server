@@ -2,7 +2,7 @@ package main
 
 import (
 	"bytes"
-	"compress/zlib"
+	"compress/gzip"
 	"encoding/csv"
 	"encoding/json"
 	"io/ioutil"
@@ -134,14 +134,20 @@ func (p *PersistObject) toLightJSON() (s string, err error) {
 }
 
 func (p *PersistObject) toZJSON(from uint32, to uint32) (s string, err error) {
-	var b bytes.Buffer
-	w := zlib.NewWriter(&b)
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
 	data, err := p.toJSON(from, to)
-	w.Write([]byte(data))
-	w.Close()
 
-	s = string(data[:])
-	return s, err
+	_, err = zw.Write([]byte(data))
+	if err != nil {
+		return s, err
+	}
+
+	if err := zw.Close(); err != nil {
+		return s, err
+	}
+
+	return buf.String(), err
 }
 
 func (p *PersistObject) toCSV(from uint32, to uint32) (s string, err error) {
