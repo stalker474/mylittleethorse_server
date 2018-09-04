@@ -35,6 +35,11 @@ func enableDecorators(w *http.ResponseWriter) {
 	(*w).Header().Set("Content-Type", "text/plain")
 }
 
+func enableDecoratorsGz(w *http.ResponseWriter) {
+	(*w).Header().Set("Content-Encoding", "gzip")
+	(*w).Header().Set("Content-Type", "text/javascript")
+}
+
 func getFromAndTo(r *http.Request) (from uint32, to uint32, err error) {
 	keysFrom, okFrom := r.URL.Query()["from"]
 	keysTo, okTo := r.URL.Query()["to"]
