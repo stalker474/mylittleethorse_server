@@ -111,7 +111,7 @@ func (s *Server) Serve(port string) error {
 	})
 
 	http.HandleFunc("/zjson", func(w http.ResponseWriter, r *http.Request) {
-		enableDecorators(&w)
+		enableDecoratorsGz(&w)
 		enableCors(&w)
 		from, to, err := getFromAndTo(r)
 		if err != nil {
