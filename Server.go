@@ -4,13 +4,15 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"sync/atomic"
 )
 
 // Server Represents our api server
 type Server struct {
-	data  *PersistObject
-	cache map[string]string
+	data     *PersistObject
+	cacheMux sync.Mutex
+	cache    map[string]string
 }
 
 // NewServer blabla
@@ -76,6 +78,7 @@ func (s *Server) Serve(port string) error {
 			fmt.Fprintln(w, err.Error())
 		}
 		req := "json" + strconv.Itoa(int(from)) + "_" + strconv.Itoa(int(to))
+		s.cacheMux.Lock()
 		_, exists := s.cache[req]
 		if exists {
 			fmt.Fprintln(w, s.cache[req])
@@ -89,12 +92,14 @@ func (s *Server) Serve(port string) error {
 				s.cache[req] = str
 			}
 		}
+		s.cacheMux.Unlock()
 	})
 
 	http.HandleFunc("/bridge", func(w http.ResponseWriter, r *http.Request) {
 		enableDecorators(&w)
 		enableCors(&w)
 		req := "bridge"
+		s.cacheMux.Lock()
 		_, exists := s.cache[req]
 		if exists {
 			fmt.Fprintln(w, s.cache[req])
@@ -108,6 +113,7 @@ func (s *Server) Serve(port string) error {
 				s.cache[req] = str
 			}
 		}
+		s.cacheMux.Unlock()
 	})
 
 	http.HandleFunc("/zjson", func(w http.ResponseWriter, r *http.Request) {
@@ -118,6 +124,7 @@ func (s *Server) Serve(port string) error {
 			fmt.Fprintln(w, err.Error())
 		}
 		req := "zjson" + strconv.Itoa(int(from)) + "_" + strconv.Itoa(int(to))
+		s.cacheMux.Lock()
 		_, exists := s.cache[req]
 		if exists {
 			fmt.Fprintln(w, s.cache[req])
@@ -131,6 +138,7 @@ func (s *Server) Serve(port string) error {
 				s.cache[req] = str
 			}
 		}
+		s.cacheMux.Unlock()
 	})
 
 	http.HandleFunc("/csv", func(w http.ResponseWriter, r *http.Request) {
@@ -141,6 +149,7 @@ func (s *Server) Serve(port string) error {
 			fmt.Fprintln(w, err.Error())
 		}
 		req := "zjson" + strconv.Itoa(int(from)) + "_" + strconv.Itoa(int(to))
+		s.cacheMux.Lock()
 		_, exists := s.cache[req]
 		if exists {
 			fmt.Fprintln(w, s.cache[req])
@@ -154,6 +163,7 @@ func (s *Server) Serve(port string) error {
 				s.cache[req] = str
 			}
 		}
+		s.cacheMux.Unlock()
 	})
 
 	http.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
