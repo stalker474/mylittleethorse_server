@@ -35,6 +35,12 @@ type Bet struct {
 	From  string  `json:"from"`
 }
 
+// odd blabla
+type Odd struct {
+	Value float32 `json:"value"`
+	Horse string  `json:"horse"`
+}
+
 // Withdraw blabla
 type Withdraw struct {
 	Value float32 `json:"value"`
@@ -51,6 +57,7 @@ type RaceData struct {
 	RaceNumber      uint32     `json:"race_number"`
 	Version         uint64     `json:"version"`
 	WinnerHorses    []string   `json:"winner_horses"`
+	Odds            []Odd      `json:"odds"`
 	Bets            []Bet      `json:"bets"`
 	Withdraws       []Withdraw `json:"withdraws"`
 	Volume          float32    `json:"volume"`
@@ -120,7 +127,7 @@ func (p *PersistObject) toLightJSON() (s string, err error) {
 			EndTime:         strconv.Itoa(int(value.EndTime)),
 			RaceNumber:      strconv.Itoa(int(value.RaceNumber)),
 			V:               int(value.Version),
-			Active:          "Closed"})
+			Active:          value.Active})
 	}
 
 	data, err := json.Marshal(r)
@@ -176,6 +183,15 @@ func (p *PersistObject) toCSV(from uint32, to uint32) (s string, err error) {
 	err = wr.WriteAll(records)
 
 	return buffer.String(), err
+}
+
+func (r *RaceData) findOdds(horse string) *Odd {
+	for i := 0; i < len(r.Odds); i++ {
+		if strings.Compare(horse, r.Odds[i].Horse) == 0 {
+			return &r.Odds[i]
+		}
+	}
+	return nil
 }
 
 // NewCache blabla

@@ -292,8 +292,18 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 			deposits = nil
 
 			race.Volume = 0
+			race.Odds = []Odd{{Value: 0.0, Horse: "BTC"}, {Value: 0.0, Horse: "ETH"}, {Value: 0.0, Horse: "LTC"}}
+			poolsMap := make(map[string]float32)
 			for _, v := range race.Bets {
 				race.Volume += v.Value
+				poolsMap[v.Horse] += v.Value
+			}
+
+			for key, value := range poolsMap {
+				odd := race.findOdds(key)
+				if odd != nil {
+					odd.Value = race.Volume / value * 0.925
+				}
 			}
 		}
 
