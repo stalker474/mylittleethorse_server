@@ -324,7 +324,7 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 			refunds = nil
 		}
 
-		if race.Bets == nil || race.WinnerHorses == nil {
+		if race.Bets == nil || race.WinnerHorses == nil && race.Active == "Closed" {
 			race.Refunded = true
 		}
 	}
