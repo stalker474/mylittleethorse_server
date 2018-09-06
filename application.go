@@ -6,7 +6,6 @@ import (
 	"log"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -20,7 +19,7 @@ var server *Server
 
 var ops uint64
 var fullRefresh uint32
-var refreshRate int64 = 60
+var refreshRate int64 = 10
 
 var wg sync.WaitGroup
 var saveNeeded uint32
@@ -33,7 +32,7 @@ func main() {
 	server = NewServer()
 	var err error
 
-	node, err = NewNode("https://mainnet.infura.io")
+	node, err = NewNode("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
 	}
@@ -105,22 +104,14 @@ func fetchNewData(full bool) bool {
 				log.Fatal("Invalid race number")
 				return false
 			}
-			//we fully fetch a race only if unknown number of the race is live
-			if (!server.data.contains(uint32(number))) || (strings.Compare(v.Active, "Closed") != 0) { //new value or live race
-				log.Println("try to get it : #", number)
+			elapsed := time.Now().Unix() - int64(date)
+			//we fully fetch only new races
+			if (elapsed < 24*60*60) || full {
+				log.Println("Fetching : #", number)
 				wg.Add(1)
 				atomic.AddUint64(&ops, 1)
 				go asyncFetchRaceData(v, uint32(number), node)
-			} else {
-				elapsed := time.Now().Unix() - int64(date)
-				if (elapsed < 48*60*60) || full {
-					log.Println("Get BS data again : #", number)
-					wg.Add(1)
-					atomic.AddUint64(&ops, 1)
-					go asyncUpdateRaceData(uint32(number), node)
-				}
 			}
-
 		}
 	} else {
 		wg.Add(len(server.data.racesData))
@@ -236,7 +227,6 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 	var deposits *BettingDepositIterator
 	var withdraws *BettingWithdrawIterator
 	var refunds *BettingRefundEnabledIterator
-	changed := false
 
 	for !queries["WinnerHorseBTC"] || !queries["WinnerHorseLTC"] || !queries["WinnerHorseETH"] || !queries["Bets"] || !queries["Withdraws"] || !queries["Refund"] {
 
@@ -245,9 +235,17 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 			queries["WinnerHorseBTC"] = (err == nil)
 		}
 
+		if err != nil {
+			log.Println("Error on #", race.RaceNumber)
+		}
+
 		if !queries["WinnerHorseLTC"] {
 			ltcWon, err = contract.WinnerHorse(nil, ToBytes32("LTC"))
 			queries["WinnerHorseLTC"] = (err == nil)
+		}
+
+		if err != nil {
+			log.Println("Error on #", race.RaceNumber)
 		}
 
 		if !queries["WinnerHorseETH"] {
@@ -255,19 +253,35 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 			queries["WinnerHorseETH"] = (err == nil)
 		}
 
+		if err != nil {
+			log.Println("Error on #", race.RaceNumber)
+		}
+
 		if !queries["Bets"] {
-			deposits, err = contract.BettingFilterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+			deposits, err = contract.BettingFilterer.FilterDeposit(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
 			queries["Bets"] = (err == nil)
 		}
 
+		if err != nil {
+			log.Println("Error on #", race.RaceNumber)
+		}
+
 		if !queries["Withdraws"] {
-			withdraws, err = contract.BettingFilterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+			withdraws, err = contract.BettingFilterer.FilterWithdraw(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
 			queries["Withdraws"] = (err == nil)
 		}
 
+		if err != nil {
+			log.Println("Error on #", race.RaceNumber)
+		}
+
 		if !queries["Refund"] {
-			refunds, err = contract.BettingFilterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+			refunds, err = contract.BettingFilterer.FilterRefundEnabled(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
 			queries["Refund"] = (err == nil)
+		}
+
+		if err != nil {
+			log.Println("Error on #", race.RaceNumber)
 		}
 
 		if btcWon || ltcWon || ethWon {
@@ -276,12 +290,15 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 
 		if btcWon {
 			race.WinnerHorses = append(race.WinnerHorses, "BTC")
+			btcWon = false
 		}
 		if ltcWon {
 			race.WinnerHorses = append(race.WinnerHorses, "LTC")
+			ltcWon = false
 		}
 		if ethWon {
 			race.WinnerHorses = append(race.WinnerHorses, "ETH")
+			ethWon = false
 		}
 
 		if queries["Bets"] && (deposits != nil) {
@@ -334,7 +351,7 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 		return false, err
 	}
 
-	changed = !bytes.Equal(now, original)
+	changed := !bytes.Equal(now, original)
 
 	return changed, nil
 }

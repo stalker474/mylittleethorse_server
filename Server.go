@@ -24,7 +24,9 @@ func NewServer() (s *Server) {
 }
 
 func (s *Server) resetCache() {
+	s.cacheMux.Lock()
 	s.cache = make(map[string]string)
+	s.cacheMux.Unlock()
 }
 
 func enableCors(w *http.ResponseWriter) {
