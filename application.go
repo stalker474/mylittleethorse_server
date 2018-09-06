@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -104,9 +105,9 @@ func fetchNewData(full bool) bool {
 				log.Fatal("Invalid race number")
 				return false
 			}
-
-			if !server.data.contains(uint32(number)) { //new value
-				log.Println("I dont have this race in cache, try to get it : #", number)
+			//we fully fetch a race only if unknown number of the race is live
+			if (!server.data.contains(uint32(number))) || (strings.Compare(v.Active, "Closed") != 0) { //new value or live race
+				log.Println("try to get it : #", number)
 				wg.Add(1)
 				atomic.AddUint64(&ops, 1)
 				go asyncFetchRaceData(v, uint32(number), node)
