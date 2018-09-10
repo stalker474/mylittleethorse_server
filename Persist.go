@@ -126,7 +126,7 @@ func (p *PersistObject) toLightJSON() (s string, err error) {
 			BettingDuration: strconv.Itoa(int(value.BettingDuration)),
 			EndTime:         strconv.Itoa(int(value.EndTime)),
 			RaceNumber:      strconv.Itoa(int(value.RaceNumber)),
-			V:               value.Version,
+			V:               0,
 			Active:          value.Active})
 	}
 
