@@ -18,7 +18,7 @@ type Race struct {
 	BettingDuration string `json:"betting_duration"`
 	EndTime         string `json:"end_time"`
 	RaceNumber      string `json:"race_number"`
-	V               int    `json:"__v"`
+	V               string `json:"__v"`
 	Active          string `json:"active"`
 }
 

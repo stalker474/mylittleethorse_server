@@ -199,7 +199,6 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	data.BettingDuration = uint64(bettingDuration)
 	data.EndTime = uint64(endTime)
 	data.RaceNumber = uint32(raceNumber)
-	data.Version = uint64(race.V)
 	data.Active = race.Active
 
 	_, err = updateRaceData(&data, node)
@@ -224,11 +223,12 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 	queries := make(map[string]bool)
 
 	var btcWon, ltcWon, ethWon bool
+	var version string
 	var deposits *BettingDepositIterator
 	var withdraws *BettingWithdrawIterator
 	var refunds *BettingRefundEnabledIterator
 
-	for !queries["WinnerHorseBTC"] || !queries["WinnerHorseLTC"] || !queries["WinnerHorseETH"] || !queries["Bets"] || !queries["Withdraws"] || !queries["Refund"] {
+	for !queries["WinnerHorseBTC"] || !queries["WinnerHorseLTC"] || !queries["WinnerHorseETH"] || !queries["Bets"] || !queries["Withdraws"] || !queries["Refund"] || !queries["Version"] {
 
 		if !queries["WinnerHorseBTC"] {
 			btcWon, err = contract.WinnerHorse(nil, ToBytes32("BTC"))
@@ -280,6 +280,11 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 			queries["Refund"] = (err == nil)
 		}
 
+		if !queries["Version"] {
+			version, err = contract.Version(nil)
+			queries["Version"] = (err == nil)
+		}
+
 		if err != nil {
 			log.Println("Error on #", race.RaceNumber)
 		}
@@ -299,6 +304,10 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 		if ethWon {
 			race.WinnerHorses = append(race.WinnerHorses, "ETH")
 			ethWon = false
+		}
+
+		if queries["Version"] {
+			race.Version = version
 		}
 
 		if queries["Bets"] && (deposits != nil) {

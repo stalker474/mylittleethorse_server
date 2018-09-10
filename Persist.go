@@ -55,7 +55,7 @@ type RaceData struct {
 	BettingDuration uint64     `json:"betting_duration"`
 	EndTime         uint64     `json:"end_time"`
 	RaceNumber      uint32     `json:"race_number"`
-	Version         uint64     `json:"version"`
+	Version         string     `json:"version"`
 	WinnerHorses    []string   `json:"winner_horses"`
 	Odds            []Odd      `json:"odds"`
 	Bets            []Bet      `json:"bets"`
@@ -126,7 +126,7 @@ func (p *PersistObject) toLightJSON() (s string, err error) {
 			BettingDuration: strconv.Itoa(int(value.BettingDuration)),
 			EndTime:         strconv.Itoa(int(value.EndTime)),
 			RaceNumber:      strconv.Itoa(int(value.RaceNumber)),
-			V:               int(value.Version),
+			V:               value.Version,
 			Active:          value.Active})
 	}
 
