@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"log"
 	"os"
 	"strconv"
@@ -221,11 +222,9 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-
-		race.Version, err = contract.Version(nil)
-		if err != nil {
-			log.Println("Error2 : ", err)
-			return false, err
+		err = errors.New("nothing")
+		for err != nil {
+			race.Version, err = contract.Version(nil)
 		}
 	}
 
