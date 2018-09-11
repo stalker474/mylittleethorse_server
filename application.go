@@ -51,23 +51,18 @@ func main() {
 
 func updateCache() {
 	for true {
-		conn, err := ethclient.Dial("wss://mainnet.infura.io/ws")
-		if err != nil {
-			log.Fatalf("Failed to init node: %v", err)
-		}
 		log.Println("fetching new data...")
 		if atomic.LoadUint32(&fullRefresh) == 1 {
 			log.Println("performing full blockchain data refresh")
-			fetchNewData(true, conn)
+			fetchNewData(true)
 			persist()
 			atomic.SwapUint32(&fullRefresh, 0)
 		}
-		if !fetchNewData(false, conn) {
+		if !fetchNewData(false) {
 			log.Println("No changes...")
 		} else {
 			persist()
 		}
-		conn.Close()
 		time.Sleep(time.Duration(refreshRate) * time.Second)
 	}
 }
@@ -78,11 +73,17 @@ func persist() {
 	log.Println("Cache Updated")
 }
 
-func fetchNewData(full bool, conn *ethclient.Client) bool {
+func fetchNewData(full bool) bool {
 	atomic.StoreUint32(&saveNeeded, 0)
 
 	var races []Race
 	var err error
+
+	conn, err := ethclient.Dial("wss://mainnet.infura.io/ws")
+	if err != nil {
+		log.Fatalf("Failed to init node: %v", err)
+	}
+
 	if !full {
 		// get finished races list from ethorse bridge
 		log.Println("fetching ethorse bridge archive race list")
@@ -126,6 +127,7 @@ func fetchNewData(full bool, conn *ethclient.Client) bool {
 	}
 
 	wg.Wait()
+	conn.Close()
 	log.Println("DONE")
 
 	return atomic.LoadUint32(&saveNeeded) == 1
