@@ -208,41 +208,56 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 }
 
 func updateRaceData(race *RaceData, node *Node) (bool, error) {
+	original, err := json.Marshal(race)
+	if err != nil {
+		return false, err
+	}
+
 	//add a version number if doesnt exist
 	//a version number must be in this format X.X.X
 	if len(race.Version) < 5 {
 		// Instantiate the contract and display its name
 		contract, err := NewBetting(common.HexToAddress(race.ContractID), node.Conn)
 		if err != nil {
+			log.Println("Error1")
 			return false, err
 		}
 
 		race.Version, err = contract.Version(nil)
 		if err != nil {
+			log.Println("Error2")
 			return false, err
 		}
 	}
 
 	if strings.Compare(race.Version, "0.2.2") == 0 {
-		return updateRaceData022(race, node)
+		err = updateRaceData022(race, node)
 	} else if strings.Compare(race.Version, "0.2.3") == 0 {
-		return updateRaceData023(race, node)
+		err = updateRaceData023(race, node)
 	} else {
-		return updateRaceData024(race, node)
+		err = updateRaceData024(race, node)
 	}
+	if err != nil {
+		log.Println("Error3")
+		return false, err
+	}
+
+	now, err := json.Marshal(race)
+	if err != nil {
+		log.Println("Error4")
+		return false, err
+	}
+
+	changed := !bytes.Equal(now, original)
+	return changed, err
 }
 
-func updateRaceData022(race *RaceData, node *Node) (bool, error) {
+func updateRaceData022(race *RaceData, node *Node) error {
 	var err error
 
 	contract, err := NewBetting022(common.HexToAddress(race.ContractID), node.Conn)
 	if err != nil {
-		return false, err
-	}
-
-	original, err := json.Marshal(race)
-	if err != nil {
-		return false, err
+		return err
 	}
 
 	queries := make(map[string]bool)
@@ -356,28 +371,15 @@ func updateRaceData022(race *RaceData, node *Node) (bool, error) {
 			race.Refunded = true
 		}
 	}
-
-	now, err := json.Marshal(race)
-	if err != nil {
-		return false, err
-	}
-
-	changed := !bytes.Equal(now, original)
-
-	return changed, nil
+	return nil
 }
 
-func updateRaceData023(race *RaceData, node *Node) (bool, error) {
+func updateRaceData023(race *RaceData, node *Node) error {
 	var err error
 
 	contract, err := NewBetting023(common.HexToAddress(race.ContractID), node.Conn)
 	if err != nil {
-		return false, err
-	}
-
-	original, err := json.Marshal(race)
-	if err != nil {
-		return false, err
+		return err
 	}
 
 	queries := make(map[string]bool)
@@ -505,27 +507,15 @@ func updateRaceData023(race *RaceData, node *Node) (bool, error) {
 		}
 	}
 
-	now, err := json.Marshal(race)
-	if err != nil {
-		return false, err
-	}
-
-	changed := !bytes.Equal(now, original)
-
-	return changed, nil
+	return nil
 }
 
-func updateRaceData024(race *RaceData, node *Node) (bool, error) {
+func updateRaceData024(race *RaceData, node *Node) error {
 	var err error
-
-	original, err := json.Marshal(race)
-	if err != nil {
-		return false, err
-	}
 
 	contract, err := NewBetting024(common.HexToAddress(race.ContractID), node.Conn)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	chronus, err := contract.Chronus(nil)
@@ -658,12 +648,5 @@ func updateRaceData024(race *RaceData, node *Node) (bool, error) {
 		}
 	}
 
-	now, err := json.Marshal(race)
-	if err != nil {
-		return false, err
-	}
-
-	changed := !bytes.Equal(now, original)
-
-	return changed, nil
+	return nil
 }
