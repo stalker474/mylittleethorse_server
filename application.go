@@ -219,13 +219,12 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 		// Instantiate the contract and display its name
 		contract, err := NewBetting(common.HexToAddress(race.ContractID), node.Conn)
 		if err != nil {
-			log.Println("Error1")
 			return false, err
 		}
 
 		race.Version, err = contract.Version(nil)
 		if err != nil {
-			log.Println("Error2")
+			log.Println("Error2 : ", err)
 			return false, err
 		}
 	}
@@ -244,7 +243,6 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 
 	now, err := json.Marshal(race)
 	if err != nil {
-		log.Println("Error4")
 		return false, err
 	}
 
