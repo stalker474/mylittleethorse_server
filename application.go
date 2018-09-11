@@ -34,7 +34,7 @@ func main() {
 	server = NewServer()
 	var err error
 
-	node, err = NewNode("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
+	node, err = NewNode("wss://mainnet.infura.io/ws")
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
 	}
