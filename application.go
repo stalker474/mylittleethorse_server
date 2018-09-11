@@ -226,6 +226,8 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 		for err != nil {
 			race.Version, err = contract.Version(nil)
 		}
+
+		log.Println(race.Version)
 	}
 
 	if strings.Compare(race.Version, "0.2.2") == 0 {
