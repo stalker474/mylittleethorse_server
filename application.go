@@ -8,7 +8,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -23,8 +22,8 @@ var ops uint64
 var fullRefresh uint32
 var refreshRate int64 = 10
 
-var wg sync.WaitGroup
 var saveNeeded uint32
+var conn *ethclient.Client
 
 func main() {
 	port := os.Getenv("PORT")
@@ -51,6 +50,14 @@ func main() {
 
 func updateCache() {
 	for true {
+		var err error
+		conn, err = ethclient.Dial("wss://mainnet.infura.io/ws")
+		if err != nil {
+			log.Fatalf("Failed to init node: %v", err)
+		} else {
+			defer conn.Close()
+		}
+
 		log.Println("fetching new data...")
 		if atomic.LoadUint32(&fullRefresh) == 1 {
 			log.Println("performing full blockchain data refresh")
@@ -79,11 +86,6 @@ func fetchNewData(full bool) bool {
 	var races []Race
 	var err error
 
-	conn, err := ethclient.Dial("wss://mainnet.infura.io/ws")
-	if err != nil {
-		log.Fatalf("Failed to init node: %v", err)
-	}
-
 	if !full {
 		// get finished races list from ethorse bridge
 		log.Println("fetching ethorse bridge archive race list")
@@ -111,31 +113,27 @@ func fetchNewData(full bool) bool {
 			//we fully fetch only new races
 			if (elapsed < 24*60*60) || full {
 				log.Println("Fetching : #", number)
-				wg.Add(1)
 				atomic.AddUint64(&ops, 1)
-				go asyncFetchRaceData(v, uint32(number), conn)
+				syncFetchRaceData(v, uint32(number))
 			}
 		}
 	} else {
-		wg.Add(len(server.data.racesData))
 		atomic.AddUint64(&ops, uint64(len(server.data.racesData)))
 		//its a full refresh, we reload all race data from blockchain
 		for _, value := range server.data.racesData {
-			go asyncUpdateRaceData(value.RaceNumber, conn)
+			syncUpdateRaceData(value.RaceNumber)
 		}
 		atomic.StoreUint32(&saveNeeded, 1) //always save
 	}
 
-	wg.Wait()
-	conn.Close()
 	log.Println("DONE")
 
 	return atomic.LoadUint32(&saveNeeded) == 1
 }
 
-func asyncFetchRaceData(race Race, raceNumber uint32, conn *ethclient.Client) {
-	defer wg.Done()
-	newRaceData, err := fetchRaceData(&race, conn)
+func syncFetchRaceData(race Race, raceNumber uint32) {
+	//defer wg.Done()
+	newRaceData, err := fetchRaceData(&race)
 	if err != nil {
 		log.Println("FAILED COMPLETELY: race #", race.RaceNumber, " error:", err)
 	} else {
@@ -150,12 +148,11 @@ func asyncFetchRaceData(race Race, raceNumber uint32, conn *ethclient.Client) {
 	atomic.StoreUint32(&saveNeeded, 1)
 }
 
-func asyncUpdateRaceData(raceNumber uint32, conn *ethclient.Client) {
-	defer wg.Done()
+func syncUpdateRaceData(raceNumber uint32) {
 	server.data.mux.Lock()
 	race, _ := server.data.racesData[raceNumber]
 	server.data.mux.Unlock()
-	changed, err := updateRaceData(&race, conn)
+	changed, err := updateRaceData(&race)
 	if err != nil {
 		log.Println("FAILED COMPLETELY: race #", race.RaceNumber)
 	} else {
@@ -172,7 +169,7 @@ func asyncUpdateRaceData(raceNumber uint32, conn *ethclient.Client) {
 	atomic.AddUint64(&ops, ^uint64(0))
 }
 
-func fetchRaceData(race *Race, conn *ethclient.Client) (RaceData, error) {
+func fetchRaceData(race *Race) (RaceData, error) {
 	data := RaceData{}
 	var err error
 
@@ -205,12 +202,12 @@ func fetchRaceData(race *Race, conn *ethclient.Client) (RaceData, error) {
 	data.RaceNumber = uint32(raceNumber)
 	data.Active = race.Active
 
-	_, err = updateRaceData(&data, conn)
+	_, err = updateRaceData(&data)
 
 	return data, err
 }
 
-func updateRaceData(race *RaceData, conn *ethclient.Client) (bool, error) {
+func updateRaceData(race *RaceData) (bool, error) {
 	original, err := json.Marshal(race)
 	if err != nil {
 		return false, err
@@ -224,23 +221,24 @@ func updateRaceData(race *RaceData, conn *ethclient.Client) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-		err = errors.New("nothing")
-		for err != nil {
-			race.Version, err = contract.Version(nil)
+
+		race.Version, err = contract.Version(nil)
+
+		if err != nil {
+			return false, err
 		}
-
-		log.Println(race.Version)
 	}
 
-	if strings.Compare(race.Version, "0.2.2") == 0 {
-		err = updateRaceData022(race, conn)
-	} else if strings.Compare(race.Version, "0.2.3") == 0 {
-		err = updateRaceData023(race, conn)
-	} else {
-		err = updateRaceData024(race, conn)
-	}
-	if err != nil {
-		return false, err
+	err = errors.New("dummyError")
+	for err != nil {
+		if strings.Compare(race.Version, "0.2.2") == 0 {
+			err = updateRaceData022(race)
+		} else if strings.Compare(race.Version, "0.2.3") == 0 {
+			err = updateRaceData023(race)
+		} else {
+			err = updateRaceData024(race)
+		}
+		log.Println("#", race.RaceNumber, " Error : ", err)
 	}
 
 	now, err := json.Marshal(race)
@@ -252,397 +250,238 @@ func updateRaceData(race *RaceData, conn *ethclient.Client) (bool, error) {
 	return changed, err
 }
 
-func updateRaceData022(race *RaceData, conn *ethclient.Client) error {
-	var err error
-
+func updateRaceData022(race *RaceData) error {
 	contract, err := NewBetting022(common.HexToAddress(race.ContractID), conn)
 	if err != nil {
 		return err
 	}
 
-	queries := make(map[string]bool)
+	btcWon, err := contract.WinnerHorse(nil, ToBytes32("BTC"))
+	if err != nil {
+		return err
+	}
+	ltcWon, err := contract.WinnerHorse(nil, ToBytes32("LTC"))
+	if err != nil {
+		return err
+	}
+	ethWon, err := contract.WinnerHorse(nil, ToBytes32("ETH"))
+	if err != nil {
+		return err
+	}
+	deposits, err := contract.Betting022Filterer.FilterDeposit(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	if err != nil {
+		return err
+	}
+	defer deposits.Close()
+	withdraws, err := contract.Betting022Filterer.FilterWithdraw(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	if err != nil {
+		return err
+	}
+	defer withdraws.Close()
 
-	var btcWon, ltcWon, ethWon bool
-	var deposits *Betting022DepositIterator
-	var withdraws *Betting022WithdrawIterator
+	if btcWon || ltcWon || ethWon {
+		race.WinnerHorses = nil
+	}
 
-	for !queries["WinnerHorseBTC"] || !queries["WinnerHorseLTC"] || !queries["WinnerHorseETH"] || !queries["Bets"] || !queries["Withdraws"] {
+	if btcWon {
+		race.WinnerHorses = append(race.WinnerHorses, "BTC")
+	}
+	if ltcWon {
+		race.WinnerHorses = append(race.WinnerHorses, "LTC")
+	}
+	if ethWon {
+		race.WinnerHorses = append(race.WinnerHorses, "ETH")
+	}
 
-		if !queries["WinnerHorseBTC"] {
-			btcWon, err = contract.WinnerHorse(nil, ToBytes32("BTC"))
-			queries["WinnerHorseBTC"] = (err == nil)
+	race.Bets = nil
+	for deposits.Next() {
+		race.Bets = append(race.Bets, Bet{WeiToEth(deposits.Event.Value), FromBytes32(deposits.Event.Horse)[0:3], deposits.Event.From.Hex()})
+	}
+
+	race.Volume = 0
+	race.Odds = []Odd{{Value: 0.0, Horse: "BTC"}, {Value: 0.0, Horse: "ETH"}, {Value: 0.0, Horse: "LTC"}}
+	poolsMap := make(map[string]float32)
+	for _, v := range race.Bets {
+		race.Volume += v.Value
+		poolsMap[v.Horse] += v.Value
+	}
+
+	for key, value := range poolsMap {
+		odd := race.findOdds(key)
+		if odd != nil {
+			odd.Value = race.Volume / value * 0.925
 		}
+	}
 
-		if err != nil {
-			log.Println("Error WinnerHorseBTC on #", race.RaceNumber)
-		}
+	race.Withdraws = nil
+	for withdraws.Next() {
+		race.Withdraws = append(race.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
+	}
 
-		if !queries["WinnerHorseLTC"] {
-			ltcWon, err = contract.WinnerHorse(nil, ToBytes32("LTC"))
-			queries["WinnerHorseLTC"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error WinnerHorseLTC on #", race.RaceNumber)
-		}
-
-		if !queries["WinnerHorseETH"] {
-			ethWon, err = contract.WinnerHorse(nil, ToBytes32("ETH"))
-			queries["WinnerHorseETH"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error WinnerHorseETH on #", race.RaceNumber)
-		}
-
-		if !queries["Bets"] {
-			deposits, err = contract.Betting022Filterer.FilterDeposit(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
-			queries["Bets"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error Bets on #", race.RaceNumber)
-		}
-
-		if !queries["Withdraws"] {
-			withdraws, err = contract.Betting022Filterer.FilterWithdraw(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
-			queries["Withdraws"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error Withdraws on #", race.RaceNumber)
-		}
-
-		if btcWon || ltcWon || ethWon {
-			race.WinnerHorses = nil
-		}
-
-		if btcWon {
-			race.WinnerHorses = append(race.WinnerHorses, "BTC")
-			btcWon = false
-		}
-		if ltcWon {
-			race.WinnerHorses = append(race.WinnerHorses, "LTC")
-			ltcWon = false
-		}
-		if ethWon {
-			race.WinnerHorses = append(race.WinnerHorses, "ETH")
-			ethWon = false
-		}
-
-		if queries["Bets"] && (deposits != nil) {
-			race.Bets = nil
-			for deposits.Next() {
-				race.Bets = append(race.Bets, Bet{WeiToEth(deposits.Event.Value), FromBytes32(deposits.Event.Horse)[0:3], deposits.Event.From.Hex()})
-			}
-			deposits.Close()
-			deposits = nil
-
-			race.Volume = 0
-			race.Odds = []Odd{{Value: 0.0, Horse: "BTC"}, {Value: 0.0, Horse: "ETH"}, {Value: 0.0, Horse: "LTC"}}
-			poolsMap := make(map[string]float32)
-			for _, v := range race.Bets {
-				race.Volume += v.Value
-				poolsMap[v.Horse] += v.Value
-			}
-
-			for key, value := range poolsMap {
-				odd := race.findOdds(key)
-				if odd != nil {
-					odd.Value = race.Volume / value * 0.925
-				}
-			}
-		}
-
-		if queries["Withdraws"] && (withdraws != nil) {
-			race.Withdraws = nil
-			for withdraws.Next() {
-				race.Withdraws = append(race.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
-			}
-			withdraws.Close()
-			withdraws = nil
-		}
-
-		if race.Bets == nil || race.WinnerHorses == nil && race.Active == "Closed" {
-			race.Refunded = true
-		}
+	if race.Bets == nil || race.WinnerHorses == nil && race.Active == "Closed" {
+		race.Refunded = true
 	}
 	return nil
 }
 
-func updateRaceData023(race *RaceData, conn *ethclient.Client) error {
-	var err error
-
+func updateRaceData023(race *RaceData) error {
 	contract, err := NewBetting023(common.HexToAddress(race.ContractID), conn)
 	if err != nil {
 		return err
 	}
 
-	queries := make(map[string]bool)
+	btcWon, err := contract.WinnerHorse(nil, ToBytes32("BTC"))
+	if err != nil {
+		return err
+	}
+	ltcWon, err := contract.WinnerHorse(nil, ToBytes32("LTC"))
+	if err != nil {
+		return err
+	}
+	ethWon, err := contract.WinnerHorse(nil, ToBytes32("ETH"))
+	if err != nil {
+		return err
+	}
+	deposits, err := contract.Betting023Filterer.FilterDeposit(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	if err != nil {
+		return err
+	}
+	defer deposits.Close()
+	withdraws, err := contract.Betting023Filterer.FilterWithdraw(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	if err != nil {
+		return err
+	}
+	defer withdraws.Close()
+	refunds, err := contract.Betting023Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	if err != nil {
+		return err
+	}
+	defer refunds.Close()
 
-	var btcWon, ltcWon, ethWon bool
-	var deposits *Betting023DepositIterator
-	var withdraws *Betting023WithdrawIterator
-	var refunds *Betting023RefundEnabledIterator
+	if btcWon || ltcWon || ethWon {
+		race.WinnerHorses = nil
+	}
 
-	for !queries["WinnerHorseBTC"] || !queries["WinnerHorseLTC"] || !queries["WinnerHorseETH"] || !queries["Bets"] || !queries["Withdraws"] || !queries["Refund"] {
+	if btcWon {
+		race.WinnerHorses = append(race.WinnerHorses, "BTC")
+	}
+	if ltcWon {
+		race.WinnerHorses = append(race.WinnerHorses, "LTC")
+	}
+	if ethWon {
+		race.WinnerHorses = append(race.WinnerHorses, "ETH")
+	}
 
-		if !queries["WinnerHorseBTC"] {
-			btcWon, err = contract.WinnerHorse(nil, ToBytes32("BTC"))
-			queries["WinnerHorseBTC"] = (err == nil)
-		}
+	race.Bets = nil
+	for deposits.Next() {
+		race.Bets = append(race.Bets, Bet{WeiToEth(deposits.Event.Value), FromBytes32(deposits.Event.Horse)[0:3], deposits.Event.From.Hex()})
+	}
 
-		if err != nil {
-			log.Println("Error on #", race.RaceNumber, " error: ", err)
-		}
+	race.Volume = 0
+	race.Odds = []Odd{{Value: 0.0, Horse: "BTC"}, {Value: 0.0, Horse: "ETH"}, {Value: 0.0, Horse: "LTC"}}
+	poolsMap := make(map[string]float32)
+	for _, v := range race.Bets {
+		race.Volume += v.Value
+		poolsMap[v.Horse] += v.Value
+	}
 
-		if !queries["WinnerHorseLTC"] {
-			ltcWon, err = contract.WinnerHorse(nil, ToBytes32("LTC"))
-			queries["WinnerHorseLTC"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error on #", race.RaceNumber, " error: ", err)
-		}
-
-		if !queries["WinnerHorseETH"] {
-			ethWon, err = contract.WinnerHorse(nil, ToBytes32("ETH"))
-			queries["WinnerHorseETH"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error on #", race.RaceNumber, " error: ", err)
-		}
-
-		if !queries["Bets"] {
-			deposits, err = contract.Betting023Filterer.FilterDeposit(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
-			queries["Bets"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error on #", race.RaceNumber, " error: ", err)
-		}
-
-		if !queries["Withdraws"] {
-			withdraws, err = contract.Betting023Filterer.FilterWithdraw(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
-			queries["Withdraws"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error on #", race.RaceNumber, " error: ", err)
-		}
-
-		if !queries["Refund"] {
-			refunds, err = contract.Betting023Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
-			queries["Refund"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error on #", race.RaceNumber, " error: ", err)
-		}
-
-		if btcWon || ltcWon || ethWon {
-			race.WinnerHorses = nil
-		}
-
-		if btcWon {
-			race.WinnerHorses = append(race.WinnerHorses, "BTC")
-			btcWon = false
-		}
-		if ltcWon {
-			race.WinnerHorses = append(race.WinnerHorses, "LTC")
-			ltcWon = false
-		}
-		if ethWon {
-			race.WinnerHorses = append(race.WinnerHorses, "ETH")
-			ethWon = false
-		}
-
-		if queries["Bets"] && (deposits != nil) {
-			race.Bets = nil
-			for deposits.Next() {
-				race.Bets = append(race.Bets, Bet{WeiToEth(deposits.Event.Value), FromBytes32(deposits.Event.Horse)[0:3], deposits.Event.From.Hex()})
-			}
-			deposits.Close()
-			deposits = nil
-
-			race.Volume = 0
-			race.Odds = []Odd{{Value: 0.0, Horse: "BTC"}, {Value: 0.0, Horse: "ETH"}, {Value: 0.0, Horse: "LTC"}}
-			poolsMap := make(map[string]float32)
-			for _, v := range race.Bets {
-				race.Volume += v.Value
-				poolsMap[v.Horse] += v.Value
-			}
-
-			for key, value := range poolsMap {
-				odd := race.findOdds(key)
-				if odd != nil {
-					odd.Value = race.Volume / value * 0.925
-				}
-			}
-		}
-
-		if queries["Withdraws"] && (withdraws != nil) {
-			race.Withdraws = nil
-			for withdraws.Next() {
-				race.Withdraws = append(race.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
-			}
-			withdraws.Close()
-			withdraws = nil
-		}
-
-		if queries["Refund"] && (refunds != nil) {
-			race.Refunded = refunds.Next()
-			refunds.Close()
-
-			refunds = nil
-		}
-
-		if race.Bets == nil || race.WinnerHorses == nil && race.Active == "Closed" {
-			race.Refunded = true
+	for key, value := range poolsMap {
+		odd := race.findOdds(key)
+		if odd != nil {
+			odd.Value = race.Volume / value * 0.925
 		}
 	}
 
+	race.Withdraws = nil
+	for withdraws.Next() {
+		race.Withdraws = append(race.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
+	}
+
+	race.Refunded = refunds.Next()
+
+	if race.Bets == nil || race.WinnerHorses == nil && race.Active == "Closed" {
+		race.Refunded = true
+	}
 	return nil
 }
 
-func updateRaceData024(race *RaceData, conn *ethclient.Client) error {
-	var err error
-
+func updateRaceData024(race *RaceData) error {
 	contract, err := NewBetting024(common.HexToAddress(race.ContractID), conn)
 	if err != nil {
 		return err
 	}
 
-	chronus, err := contract.Chronus(nil)
-	if chronus.StartingTime != 0 {
-		log.Println("DATA!!")
+	btcWon, err := contract.WinnerHorse(nil, ToBytes32("BTC"))
+	if err != nil {
+		return err
+	}
+	ltcWon, err := contract.WinnerHorse(nil, ToBytes32("LTC"))
+	if err != nil {
+		return err
+	}
+	ethWon, err := contract.WinnerHorse(nil, ToBytes32("ETH"))
+	if err != nil {
+		return err
+	}
+	deposits, err := contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	if err != nil {
+		return err
+	}
+	defer deposits.Close()
+	withdraws, err := contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	if err != nil {
+		return err
+	}
+	defer withdraws.Close()
+	refunds, err := contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	if err != nil {
+		return err
+	}
+	defer refunds.Close()
+
+	if btcWon || ltcWon || ethWon {
+		race.WinnerHorses = nil
 	}
 
-	queries := make(map[string]bool)
+	if btcWon {
+		race.WinnerHorses = append(race.WinnerHorses, "BTC")
+	}
+	if ltcWon {
+		race.WinnerHorses = append(race.WinnerHorses, "LTC")
+	}
+	if ethWon {
+		race.WinnerHorses = append(race.WinnerHorses, "ETH")
+	}
 
-	var btcWon, ltcWon, ethWon bool
-	var deposits *Betting024DepositIterator
-	var withdraws *Betting024WithdrawIterator
-	var refunds *Betting024RefundEnabledIterator
+	race.Bets = nil
+	for deposits.Next() {
+		race.Bets = append(race.Bets, Bet{WeiToEth(deposits.Event.Value), FromBytes32(deposits.Event.Horse)[0:3], deposits.Event.From.Hex()})
+	}
 
-	for !queries["WinnerHorseBTC"] || !queries["WinnerHorseLTC"] || !queries["WinnerHorseETH"] || !queries["Bets"] || !queries["Withdraws"] || !queries["Refund"] {
+	race.Volume = 0
+	race.Odds = []Odd{{Value: 0.0, Horse: "BTC"}, {Value: 0.0, Horse: "ETH"}, {Value: 0.0, Horse: "LTC"}}
+	poolsMap := make(map[string]float32)
+	for _, v := range race.Bets {
+		race.Volume += v.Value
+		poolsMap[v.Horse] += v.Value
+	}
 
-		if !queries["WinnerHorseBTC"] {
-			btcWon, err = contract.WinnerHorse(nil, ToBytes32("BTC"))
-			queries["WinnerHorseBTC"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error on #", race.RaceNumber, " error: ", err)
-		}
-
-		if !queries["WinnerHorseLTC"] {
-			ltcWon, err = contract.WinnerHorse(nil, ToBytes32("LTC"))
-			queries["WinnerHorseLTC"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error on #", race.RaceNumber, " error: ", err)
-		}
-
-		if !queries["WinnerHorseETH"] {
-			ethWon, err = contract.WinnerHorse(nil, ToBytes32("ETH"))
-			queries["WinnerHorseETH"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error on #", race.RaceNumber, " error: ", err)
-		}
-
-		if !queries["Bets"] {
-			deposits, err = contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
-			queries["Bets"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error on #", race.RaceNumber, " error: ", err)
-		}
-
-		if !queries["Withdraws"] {
-			withdraws, err = contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
-			queries["Withdraws"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error on #", race.RaceNumber, " error: ", err)
-		}
-
-		if !queries["Refund"] {
-			refunds, err = contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
-			queries["Refund"] = (err == nil)
-		}
-
-		if err != nil {
-			log.Println("Error on #", race.RaceNumber, " error: ", err)
-		}
-
-		if btcWon || ltcWon || ethWon {
-			race.WinnerHorses = nil
-		}
-
-		if btcWon {
-			race.WinnerHorses = append(race.WinnerHorses, "BTC")
-			btcWon = false
-		}
-		if ltcWon {
-			race.WinnerHorses = append(race.WinnerHorses, "LTC")
-			ltcWon = false
-		}
-		if ethWon {
-			race.WinnerHorses = append(race.WinnerHorses, "ETH")
-			ethWon = false
-		}
-
-		if queries["Bets"] && (deposits != nil) {
-			race.Bets = nil
-			for deposits.Next() {
-				race.Bets = append(race.Bets, Bet{WeiToEth(deposits.Event.Value), FromBytes32(deposits.Event.Horse)[0:3], deposits.Event.From.Hex()})
-			}
-			deposits.Close()
-			deposits = nil
-
-			race.Volume = 0
-			race.Odds = []Odd{{Value: 0.0, Horse: "BTC"}, {Value: 0.0, Horse: "ETH"}, {Value: 0.0, Horse: "LTC"}}
-			poolsMap := make(map[string]float32)
-			for _, v := range race.Bets {
-				race.Volume += v.Value
-				poolsMap[v.Horse] += v.Value
-			}
-
-			for key, value := range poolsMap {
-				odd := race.findOdds(key)
-				if odd != nil {
-					odd.Value = race.Volume / value * 0.925
-				}
-			}
-		}
-
-		if queries["Withdraws"] && (withdraws != nil) {
-			race.Withdraws = nil
-			for withdraws.Next() {
-				race.Withdraws = append(race.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
-			}
-			withdraws.Close()
-			withdraws = nil
-		}
-
-		if queries["Refund"] && (refunds != nil) {
-			race.Refunded = refunds.Next()
-			refunds.Close()
-
-			refunds = nil
-		}
-
-		if race.Bets == nil || race.WinnerHorses == nil && race.Active == "Closed" {
-			race.Refunded = true
+	for key, value := range poolsMap {
+		odd := race.findOdds(key)
+		if odd != nil {
+			odd.Value = race.Volume / value * 0.925
 		}
 	}
 
+	race.Withdraws = nil
+	for withdraws.Next() {
+		race.Withdraws = append(race.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
+	}
+
+	race.Refunded = refunds.Next()
+
+	if race.Bets == nil || race.WinnerHorses == nil && race.Active == "Closed" {
+		race.Refunded = true
+	}
 	return nil
 }
