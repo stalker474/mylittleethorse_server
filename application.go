@@ -14,9 +14,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-var node *Node
 var server *Server
 
 var ops uint64
@@ -33,11 +33,6 @@ func main() {
 	}
 	server = NewServer()
 	var err error
-
-	node, err = NewNode("wss://mainnet.infura.io/ws")
-	if err != nil {
-		log.Fatalf("Failed to init node: %v", err)
-	}
 
 	if server.data.load() != nil {
 		log.Println("Failed to fetch database, creating one : ", err)
@@ -56,18 +51,23 @@ func main() {
 
 func updateCache() {
 	for true {
+		conn, err := ethclient.Dial("wss://mainnet.infura.io/ws")
+		if err != nil {
+			log.Fatalf("Failed to init node: %v", err)
+		}
 		log.Println("fetching new data...")
 		if atomic.LoadUint32(&fullRefresh) == 1 {
 			log.Println("performing full blockchain data refresh")
-			fetchNewData(true)
+			fetchNewData(true, conn)
 			persist()
 			atomic.SwapUint32(&fullRefresh, 0)
 		}
-		if !fetchNewData(false) {
+		if !fetchNewData(false, conn) {
 			log.Println("No changes...")
 		} else {
 			persist()
 		}
+		conn.Close()
 		time.Sleep(time.Duration(refreshRate) * time.Second)
 	}
 }
@@ -78,7 +78,7 @@ func persist() {
 	log.Println("Cache Updated")
 }
 
-func fetchNewData(full bool) bool {
+func fetchNewData(full bool, conn *ethclient.Client) bool {
 	atomic.StoreUint32(&saveNeeded, 0)
 
 	var races []Race
@@ -112,7 +112,7 @@ func fetchNewData(full bool) bool {
 				log.Println("Fetching : #", number)
 				wg.Add(1)
 				atomic.AddUint64(&ops, 1)
-				go asyncFetchRaceData(v, uint32(number), node)
+				go asyncFetchRaceData(v, uint32(number), conn)
 			}
 		}
 	} else {
@@ -120,7 +120,7 @@ func fetchNewData(full bool) bool {
 		atomic.AddUint64(&ops, uint64(len(server.data.racesData)))
 		//its a full refresh, we reload all race data from blockchain
 		for _, value := range server.data.racesData {
-			go asyncUpdateRaceData(value.RaceNumber, node)
+			go asyncUpdateRaceData(value.RaceNumber, conn)
 		}
 		atomic.StoreUint32(&saveNeeded, 1) //always save
 	}
@@ -131,9 +131,9 @@ func fetchNewData(full bool) bool {
 	return atomic.LoadUint32(&saveNeeded) == 1
 }
 
-func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
+func asyncFetchRaceData(race Race, raceNumber uint32, conn *ethclient.Client) {
 	defer wg.Done()
-	newRaceData, err := fetchRaceData(&race, node)
+	newRaceData, err := fetchRaceData(&race, conn)
 	if err != nil {
 		log.Println("FAILED COMPLETELY: race #", race.RaceNumber, " error:", err)
 	} else {
@@ -148,12 +148,12 @@ func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
 	atomic.StoreUint32(&saveNeeded, 1)
 }
 
-func asyncUpdateRaceData(raceNumber uint32, node *Node) {
+func asyncUpdateRaceData(raceNumber uint32, conn *ethclient.Client) {
 	defer wg.Done()
 	server.data.mux.Lock()
 	race, _ := server.data.racesData[raceNumber]
 	server.data.mux.Unlock()
-	changed, err := updateRaceData(&race, node)
+	changed, err := updateRaceData(&race, conn)
 	if err != nil {
 		log.Println("FAILED COMPLETELY: race #", race.RaceNumber)
 	} else {
@@ -170,7 +170,7 @@ func asyncUpdateRaceData(raceNumber uint32, node *Node) {
 	atomic.AddUint64(&ops, ^uint64(0))
 }
 
-func fetchRaceData(race *Race, node *Node) (RaceData, error) {
+func fetchRaceData(race *Race, conn *ethclient.Client) (RaceData, error) {
 	data := RaceData{}
 	var err error
 
@@ -203,12 +203,12 @@ func fetchRaceData(race *Race, node *Node) (RaceData, error) {
 	data.RaceNumber = uint32(raceNumber)
 	data.Active = race.Active
 
-	_, err = updateRaceData(&data, node)
+	_, err = updateRaceData(&data, conn)
 
 	return data, err
 }
 
-func updateRaceData(race *RaceData, node *Node) (bool, error) {
+func updateRaceData(race *RaceData, conn *ethclient.Client) (bool, error) {
 	original, err := json.Marshal(race)
 	if err != nil {
 		return false, err
@@ -218,7 +218,7 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 	//a version number must be in this format X.X.X
 	if len(race.Version) < 5 {
 		// Instantiate the contract and display its name
-		contract, err := NewBetting(common.HexToAddress(race.ContractID), node.Conn)
+		contract, err := NewBetting(common.HexToAddress(race.ContractID), conn)
 		if err != nil {
 			return false, err
 		}
@@ -231,14 +231,13 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 	}
 
 	if strings.Compare(race.Version, "0.2.2") == 0 {
-		err = updateRaceData022(race, node)
+		err = updateRaceData022(race, conn)
 	} else if strings.Compare(race.Version, "0.2.3") == 0 {
-		err = updateRaceData023(race, node)
+		err = updateRaceData023(race, conn)
 	} else {
-		err = updateRaceData024(race, node)
+		err = updateRaceData024(race, conn)
 	}
 	if err != nil {
-		log.Println("Error3")
 		return false, err
 	}
 
@@ -251,10 +250,10 @@ func updateRaceData(race *RaceData, node *Node) (bool, error) {
 	return changed, err
 }
 
-func updateRaceData022(race *RaceData, node *Node) error {
+func updateRaceData022(race *RaceData, conn *ethclient.Client) error {
 	var err error
 
-	contract, err := NewBetting022(common.HexToAddress(race.ContractID), node.Conn)
+	contract, err := NewBetting022(common.HexToAddress(race.ContractID), conn)
 	if err != nil {
 		return err
 	}
@@ -369,10 +368,10 @@ func updateRaceData022(race *RaceData, node *Node) error {
 	return nil
 }
 
-func updateRaceData023(race *RaceData, node *Node) error {
+func updateRaceData023(race *RaceData, conn *ethclient.Client) error {
 	var err error
 
-	contract, err := NewBetting023(common.HexToAddress(race.ContractID), node.Conn)
+	contract, err := NewBetting023(common.HexToAddress(race.ContractID), conn)
 	if err != nil {
 		return err
 	}
@@ -505,10 +504,10 @@ func updateRaceData023(race *RaceData, node *Node) error {
 	return nil
 }
 
-func updateRaceData024(race *RaceData, node *Node) error {
+func updateRaceData024(race *RaceData, conn *ethclient.Client) error {
 	var err error
 
-	contract, err := NewBetting024(common.HexToAddress(race.ContractID), node.Conn)
+	contract, err := NewBetting024(common.HexToAddress(race.ContractID), conn)
 	if err != nil {
 		return err
 	}
