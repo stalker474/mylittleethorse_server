@@ -134,7 +134,7 @@ func asyncFetchRaceData(race Race, raceNumber uint32, node *Node) {
 	defer wg.Done()
 	newRaceData, err := fetchRaceData(&race, node)
 	if err != nil {
-		log.Println("FAILED COMPLETELY: race #", race.RaceNumber)
+		log.Println("FAILED COMPLETELY: race #", race.RaceNumber, " error:", err)
 	} else {
 		server.data.mux.Lock()
 		server.data.racesData[raceNumber] = newRaceData
