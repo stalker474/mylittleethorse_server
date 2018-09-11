@@ -273,7 +273,7 @@ func updateRaceData022(race *RaceData, node *Node) error {
 		}
 
 		if err != nil {
-			log.Println("Error on #", race.RaceNumber)
+			log.Println("Error WinnerHorseBTC on #", race.RaceNumber)
 		}
 
 		if !queries["WinnerHorseLTC"] {
@@ -282,7 +282,7 @@ func updateRaceData022(race *RaceData, node *Node) error {
 		}
 
 		if err != nil {
-			log.Println("Error on #", race.RaceNumber)
+			log.Println("Error WinnerHorseLTC on #", race.RaceNumber)
 		}
 
 		if !queries["WinnerHorseETH"] {
@@ -291,7 +291,7 @@ func updateRaceData022(race *RaceData, node *Node) error {
 		}
 
 		if err != nil {
-			log.Println("Error on #", race.RaceNumber)
+			log.Println("Error WinnerHorseETH on #", race.RaceNumber)
 		}
 
 		if !queries["Bets"] {
@@ -300,7 +300,7 @@ func updateRaceData022(race *RaceData, node *Node) error {
 		}
 
 		if err != nil {
-			log.Println("Error on #", race.RaceNumber)
+			log.Println("Error Bets on #", race.RaceNumber)
 		}
 
 		if !queries["Withdraws"] {
@@ -309,11 +309,7 @@ func updateRaceData022(race *RaceData, node *Node) error {
 		}
 
 		if err != nil {
-			log.Println("Error on #", race.RaceNumber)
-		}
-
-		if err != nil {
-			log.Println("Error on #", race.RaceNumber)
+			log.Println("Error Withdraws on #", race.RaceNumber)
 		}
 
 		if btcWon || ltcWon || ethWon {
