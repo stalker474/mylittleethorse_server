@@ -51,7 +51,7 @@ func main() {
 func updateCache() {
 	for true {
 		var err error
-		conn, err = ethclient.Dial("wss://mainnet.infura.io/ws")
+		conn, err = ethclient.Dial("wss://mainnet.infura.io/_ws")
 		if err != nil {
 			log.Fatalf("Failed to init node: %v", err)
 		} else {
@@ -238,7 +238,14 @@ func updateRaceData(race *RaceData) (bool, error) {
 		} else {
 			err = updateRaceData024(race)
 		}
-		log.Println("#", race.RaceNumber, " Error : ", err)
+		if err != nil {
+			log.Println("#", race.RaceNumber, " Error : ", err)
+			conn, err = ethclient.Dial("wss://mainnet.infura.io/_ws")
+			if err != nil {
+				log.Println("#", race.RaceNumber, " Failed to reconnect : ", err)
+			}
+		}
+
 	}
 
 	now, err := json.Marshal(race)
