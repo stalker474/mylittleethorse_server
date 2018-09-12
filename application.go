@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -234,12 +233,12 @@ func updateRaceData022(race *RaceData) error {
 	if err != nil {
 		return err
 	}
-	deposits, err := contract.Betting022Filterer.FilterDeposit(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	deposits, err := contract.Betting022Filterer.FilterDeposit(nil)
 	if err != nil {
 		return err
 	}
 	defer deposits.Close()
-	withdraws, err := contract.Betting022Filterer.FilterWithdraw(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	withdraws, err := contract.Betting022Filterer.FilterWithdraw(nil)
 	if err != nil {
 		return err
 	}
@@ -308,17 +307,17 @@ func updateRaceData023(race *RaceData) error {
 	if err != nil {
 		return err
 	}
-	deposits, err := contract.Betting023Filterer.FilterDeposit(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	deposits, err := contract.Betting023Filterer.FilterDeposit(nil)
 	if err != nil {
 		return err
 	}
 	defer deposits.Close()
-	withdraws, err := contract.Betting023Filterer.FilterWithdraw(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	withdraws, err := contract.Betting023Filterer.FilterWithdraw(nil)
 	if err != nil {
 		return err
 	}
 	defer withdraws.Close()
-	refunds, err := contract.Betting023Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	refunds, err := contract.Betting023Filterer.FilterRefundEnabled(nil)
 	if err != nil {
 		return err
 	}
@@ -389,17 +388,17 @@ func updateRaceData024(race *RaceData) error {
 	if err != nil {
 		return err
 	}
-	deposits, err := contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	deposits, err := contract.Betting024Filterer.FilterDeposit(nil)
 	if err != nil {
 		return err
 	}
 	defer deposits.Close()
-	withdraws, err := contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	withdraws, err := contract.Betting024Filterer.FilterWithdraw(nil)
 	if err != nil {
 		return err
 	}
 	defer withdraws.Close()
-	refunds, err := contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	refunds, err := contract.Betting024Filterer.FilterRefundEnabled(nil)
 	if err != nil {
 		return err
 	}
