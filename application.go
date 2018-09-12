@@ -203,7 +203,7 @@ func updateRaceData(race *RaceData) (bool, error) {
 	}
 
 	//the race data changed, check if its complete now
-	race.Complete = true
+	race.Complete = strings.Compare(race.Active, "Closed") == 0 //must be closed to be complete
 	for _, bet := range race.Bets {
 		if contains(race.WinnerHorses, bet.Horse) || race.Refunded {
 			//this bet was won or was refunded
