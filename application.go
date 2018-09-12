@@ -19,7 +19,6 @@ import (
 var server *Server
 
 var ops uint64
-var fullRefresh uint32
 var refreshRate int64 = 10
 
 var saveNeeded uint32
@@ -59,13 +58,7 @@ func updateCache() {
 		}
 
 		log.Println("fetching new data...")
-		if atomic.LoadUint32(&fullRefresh) == 1 {
-			log.Println("performing full blockchain data refresh")
-			fetchNewData(true)
-			persist()
-			atomic.SwapUint32(&fullRefresh, 0)
-		}
-		if !fetchNewData(false) {
+		if !fetchNewData() {
 			log.Println("No changes...")
 		} else {
 			persist()
@@ -80,50 +73,42 @@ func persist() {
 	log.Println("Cache Updated")
 }
 
-func fetchNewData(full bool) bool {
+func fetchNewData() bool {
 	atomic.StoreUint32(&saveNeeded, 0)
 
 	var races []Race
 	var err error
 
-	if !full {
-		// get finished races list from ethorse bridge
-		log.Println("fetching ethorse bridge archive race list")
-		races, err = fetchArchive()
+	// get finished races list from ethorse bridge
+	log.Println("fetching ethorse bridge archive race list")
+	races, err = fetchArchive()
+	if err != nil {
+		log.Fatal("Error :", err)
+		return false
+	}
+	//make a single list of bridge + ours data
+	for _, v := range races {
+		raceNumber, err := strconv.Atoi(v.RaceNumber)
 		if err != nil {
 			log.Fatal("Error :", err)
 			return false
 		}
-		for _, v := range races {
-			number, err := strconv.Atoi(v.RaceNumber)
+		server.data.mux.Lock()
+		_, contains := server.data.racesData[uint32(raceNumber)]
+		//is this a race we dont have in our list yet?
+		if !contains {
+			//create it and append
+			server.data.racesData[uint32(raceNumber)], err = v.toRaceData()
 			if err != nil {
 				log.Fatal("Error :", err)
 				return false
 			}
-			date, err := strconv.Atoi(v.Date)
-			if err != nil {
-				log.Fatal("Error :", err)
-				return false
-			}
-			if int(uint32(number)) != number {
-				log.Fatal("Invalid race number")
-				return false
-			}
-			elapsed := time.Now().Unix() - int64(date)
-			//we fully fetch only new races
-			if (elapsed < 24*60*60) || full {
-				log.Println("Fetching : #", number)
-				atomic.AddUint64(&ops, 1)
-				syncFetchRaceData(v, uint32(number))
-			}
 		}
-	} else {
-		atomic.AddUint64(&ops, uint64(len(server.data.racesData)))
-		//its a full refresh, we reload all race data from blockchain
-		for _, value := range server.data.racesData {
-			syncUpdateRaceData(value.RaceNumber)
-		}
-		atomic.StoreUint32(&saveNeeded, 1) //always save
+		server.data.mux.Unlock()
+	}
+	atomic.AddUint64(&ops, uint64(len(server.data.racesData)))
+	for raceNumber := range server.data.racesData {
+		fetchRaceData(raceNumber)
 	}
 
 	log.Println("DONE")
@@ -131,80 +116,46 @@ func fetchNewData(full bool) bool {
 	return atomic.LoadUint32(&saveNeeded) == 1
 }
 
-func syncFetchRaceData(race Race, raceNumber uint32) {
-	//defer wg.Done()
-	newRaceData, err := fetchRaceData(&race)
-	if err != nil {
-		log.Println("FAILED COMPLETELY: race #", race.RaceNumber, " error:", err)
-	} else {
-		server.data.mux.Lock()
-		server.data.racesData[raceNumber] = newRaceData
-		server.data.mux.Unlock()
-		log.Println("Success: ", raceNumber)
-	}
-
-	atomic.AddUint64(&ops, ^uint64(0))
-
-	atomic.StoreUint32(&saveNeeded, 1)
-}
-
-func syncUpdateRaceData(raceNumber uint32) {
+func fetchRaceData(raceNumber uint32) {
 	server.data.mux.Lock()
 	race, _ := server.data.racesData[raceNumber]
 	server.data.mux.Unlock()
-	changed, err := updateRaceData(&race)
-	if err != nil {
-		log.Println("FAILED COMPLETELY: race #", race.RaceNumber)
-	} else {
-		if changed {
-			server.data.mux.Lock()
-			server.data.racesData[raceNumber] = race
-			server.data.mux.Unlock()
-			atomic.StoreUint32(&saveNeeded, 1)
+	//Complete flag marks a race with all data up to date and impossible to change
+	//Such as all winners withdrew their winnings
+	if !race.Complete {
+		changed, err := updateRaceData(&race)
+		if err != nil {
+			log.Println("Failed: race #", race.RaceNumber)
+		} else {
+			if changed {
+				server.data.mux.Lock()
+				server.data.racesData[raceNumber] = race
+				server.data.mux.Unlock()
+				atomic.StoreUint32(&saveNeeded, 1)
+			}
+
+			log.Println("Success: race #", raceNumber)
 		}
-
-		log.Println("Success: ", raceNumber, " value:", atomic.LoadUint64(&ops))
 	}
-
 	atomic.AddUint64(&ops, ^uint64(0))
 }
 
-func fetchRaceData(race *Race) (RaceData, error) {
-	data := RaceData{}
-	var err error
+func contains(s []string, e string) bool {
+	for _, a := range s {
+		if strings.Compare(a, e) == 0 {
+			return true
+		}
+	}
+	return false
+}
 
-	data.ContractID = race.ContractID
-	date, err := strconv.Atoi(race.Date)
-	if err != nil {
-		return data, err
+func contains2(s []Withdraw, e string) bool {
+	for _, a := range s {
+		if strings.Compare(a.To, e) == 0 {
+			return true
+		}
 	}
-	raceNumber, err := strconv.Atoi(race.RaceNumber)
-	if err != nil {
-		return data, err
-	}
-	raceDuration, err := strconv.Atoi(race.RaceDuration)
-	if err != nil {
-		return data, err
-	}
-	bettingDuration, err := strconv.Atoi(race.BettingDuration)
-	if err != nil {
-		return data, err
-	}
-	endTime, err := strconv.Atoi(race.EndTime)
-	if err != nil {
-		return data, err
-	}
-
-	data.Date = uint64(date)
-	data.RaceDuration = uint64(raceDuration)
-	data.BettingDuration = uint64(bettingDuration)
-	data.EndTime = uint64(endTime)
-	data.RaceNumber = uint32(raceNumber)
-	data.Active = race.Active
-
-	_, err = updateRaceData(&data)
-
-	return data, err
+	return false
 }
 
 func updateRaceData(race *RaceData) (bool, error) {
@@ -221,9 +172,7 @@ func updateRaceData(race *RaceData) (bool, error) {
 		if err != nil {
 			return false, err
 		}
-
 		race.Version, err = contract.Version(nil)
-
 		if err != nil {
 			return false, err
 		}
@@ -245,7 +194,6 @@ func updateRaceData(race *RaceData) (bool, error) {
 				log.Println("#", race.RaceNumber, " Failed to reconnect : ", err)
 			}
 		}
-
 	}
 
 	now, err := json.Marshal(race)
@@ -254,6 +202,19 @@ func updateRaceData(race *RaceData) (bool, error) {
 	}
 
 	changed := !bytes.Equal(now, original)
+	//the race data changed, check if its complete now
+	race.Complete = true
+	if changed {
+		for _, bet := range race.Bets {
+			if contains(race.WinnerHorses, bet.Horse) || race.Refunded {
+				//this bet was won or was refunded
+				if !contains2(race.Withdraws, bet.From) {
+					race.Complete = false
+					break
+				}
+			}
+		}
+	}
 	return changed, err
 }
 

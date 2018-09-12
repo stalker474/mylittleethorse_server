@@ -182,14 +182,6 @@ func (s *Server) Serve(port string) error {
 		}
 
 		switch keys[0] {
-		case "updatedb":
-			s.data.save()
-			fmt.Fprintln(w, "Recached")
-			return
-		case "recache":
-			atomic.StoreUint32(&fullRefresh, 1)
-			fmt.Fprintln(w, "Full recache ordered")
-			return
 		case "report":
 			fmt.Fprintln(w, "Left to process: ", atomic.LoadUint64(&ops))
 			return

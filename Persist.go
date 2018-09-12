@@ -63,6 +63,7 @@ type RaceData struct {
 	Volume          float32    `json:"volume"`
 	Refunded        bool       `json:"refunded"`
 	Active          string     `json:"active"`
+	Complete        bool       `json:"complete"`
 }
 
 // Cache blabla
@@ -108,32 +109,6 @@ func (p *PersistObject) contains(raceNumber uint32) bool {
 func (p *PersistObject) toJSON(from uint32, to uint32) (s string, err error) {
 	p.mux.Lock()
 	data, err := json.Marshal(NewCache(p.racesData, from, to))
-	p.mux.Unlock()
-
-	s = string(data[:])
-	return s, err
-}
-
-func (p *PersistObject) toLightJSON() (s string, err error) {
-	p.mux.Lock()
-
-	var r []Race
-	for _, value := range p.racesData {
-		r = append(r, Race{
-			ContractID:      value.ContractID,
-			Date:            strconv.Itoa(int(value.Date)),
-			RaceDuration:    strconv.Itoa(int(value.RaceDuration)),
-			BettingDuration: strconv.Itoa(int(value.BettingDuration)),
-			EndTime:         strconv.Itoa(int(value.EndTime)),
-			RaceNumber:      strconv.Itoa(int(value.RaceNumber)),
-			V:               0,
-			Active:          value.Active})
-	}
-
-	data, err := json.Marshal(r)
-	if err != nil {
-		return "", err
-	}
 	p.mux.Unlock()
 
 	s = string(data[:])
@@ -192,6 +167,18 @@ func (r *RaceData) findOdds(horse string) *Odd {
 		}
 	}
 	return nil
+}
+
+func (r *RaceData) toRace() Race {
+	return Race{
+		ContractID:      r.ContractID,
+		Date:            strconv.Itoa(int(r.Date)),
+		RaceDuration:    strconv.Itoa(int(r.RaceDuration)),
+		BettingDuration: strconv.Itoa(int(r.BettingDuration)),
+		EndTime:         strconv.Itoa(int(r.EndTime)),
+		RaceNumber:      strconv.Itoa(int(r.RaceNumber)),
+		V:               0,
+		Active:          r.Active}
 }
 
 // NewCache blabla
