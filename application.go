@@ -205,6 +205,7 @@ func updateRaceData(race *RaceData) (bool, error) {
 	race.Complete = true
 	for _, bet := range race.Bets {
 		if contains(race.WinnerHorses, bet.Horse) || race.Refunded {
+			log.Println("Found a winner : ", bet.Horse)
 			//this bet was won or was refunded
 			if !contains2(race.Withdraws, bet.From) {
 				race.Complete = false
@@ -212,6 +213,7 @@ func updateRaceData(race *RaceData) (bool, error) {
 			}
 		}
 	}
+	log.Println("Complete : ", race.Complete)
 	return changed, err
 }
 
