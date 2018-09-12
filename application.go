@@ -195,17 +195,10 @@ func updateRaceData(race *RaceData) (bool, error) {
 		}
 	}
 
-	now, err := json.Marshal(race)
-	if err != nil {
-		return false, err
-	}
-
-	changed := !bytes.Equal(now, original)
 	//the race data changed, check if its complete now
 	race.Complete = true
 	for _, bet := range race.Bets {
 		if contains(race.WinnerHorses, bet.Horse) || race.Refunded {
-			log.Println("Found a winner : ", bet.Horse)
 			//this bet was won or was refunded
 			if !contains2(race.Withdraws, bet.From) {
 				race.Complete = false
@@ -213,7 +206,12 @@ func updateRaceData(race *RaceData) (bool, error) {
 			}
 		}
 	}
-	log.Println("Complete : ", race.Complete)
+	now, err := json.Marshal(race)
+	if err != nil {
+		return false, err
+	}
+
+	changed := !bytes.Equal(now, original)
 	return changed, err
 }
 
