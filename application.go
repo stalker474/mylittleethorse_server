@@ -120,19 +120,13 @@ func fetchNewData() bool {
 
 func fetchRaceData(raceNumber uint32) {
 	defer wg.Done()
-	conn, err := ethclient.Dial("wss://mainnet.infura.io/_ws")
-	if err != nil {
-		log.Fatalf("Failed to init node: %v", err)
-	} else {
-		defer conn.Close()
-	}
 	server.data.mux.Lock()
 	race, _ := server.data.racesData[raceNumber]
 	server.data.mux.Unlock()
 	//Complete flag marks a race with all data up to date and impossible to change
 	//Such as all winners withdrew their winnings
 	if !race.Complete {
-		changed, err := updateRaceData(&race, conn)
+		changed, err := updateRaceData(&race)
 		if err != nil {
 			log.Println("Failed: race #", race.RaceNumber)
 		} else {
@@ -167,10 +161,17 @@ func contains2(s []Withdraw, e string) bool {
 	return false
 }
 
-func updateRaceData(race *RaceData, conn *ethclient.Client) (bool, error) {
+func updateRaceData(race *RaceData) (bool, error) {
 	original, err := json.Marshal(race)
 	if err != nil {
 		return false, err
+	}
+
+	conn, err := ethclient.Dial("wss://mainnet.infura.io/_ws")
+	if err != nil {
+		log.Fatalf("Failed to init node: %v", err)
+	} else {
+		defer conn.Close()
 	}
 
 	//add a version number if doesnt exist
@@ -190,11 +191,11 @@ func updateRaceData(race *RaceData, conn *ethclient.Client) (bool, error) {
 	err = errors.New("dummyError")
 	for err != nil {
 		if strings.Compare(race.Version, "0.2.2") == 0 {
-			err = updateRaceData022(race, conn)
+			err = updateRaceData022(race)
 		} else if strings.Compare(race.Version, "0.2.3") == 0 {
-			err = updateRaceData023(race, conn)
+			err = updateRaceData023(race)
 		} else {
-			err = updateRaceData024(race, conn)
+			err = updateRaceData024(race)
 		}
 		if err != nil {
 			log.Println("#", race.RaceNumber, " Error : ", err)
@@ -225,7 +226,13 @@ func updateRaceData(race *RaceData, conn *ethclient.Client) (bool, error) {
 	return changed, err
 }
 
-func updateRaceData022(race *RaceData, conn *ethclient.Client) error {
+func updateRaceData022(race *RaceData) error {
+	conn, err := ethclient.Dial("wss://mainnet.infura.io/_ws")
+	if err != nil {
+		log.Fatalf("Failed to init node: %v", err)
+	} else {
+		defer conn.Close()
+	}
 	contract, err := NewBetting022(common.HexToAddress(race.ContractID), conn)
 	if err != nil {
 		return err
@@ -299,7 +306,13 @@ func updateRaceData022(race *RaceData, conn *ethclient.Client) error {
 	return nil
 }
 
-func updateRaceData023(race *RaceData, conn *ethclient.Client) error {
+func updateRaceData023(race *RaceData) error {
+	conn, err := ethclient.Dial("wss://mainnet.infura.io/_ws")
+	if err != nil {
+		log.Fatalf("Failed to init node: %v", err)
+	} else {
+		defer conn.Close()
+	}
 	contract, err := NewBetting023(common.HexToAddress(race.ContractID), conn)
 	if err != nil {
 		return err
@@ -380,7 +393,13 @@ func updateRaceData023(race *RaceData, conn *ethclient.Client) error {
 	return nil
 }
 
-func updateRaceData024(race *RaceData, conn *ethclient.Client) error {
+func updateRaceData024(race *RaceData) error {
+	conn, err := ethclient.Dial("wss://mainnet.infura.io/_ws")
+	if err != nil {
+		log.Fatalf("Failed to init node: %v", err)
+	} else {
+		defer conn.Close()
+	}
 	contract, err := NewBetting024(common.HexToAddress(race.ContractID), conn)
 	if err != nil {
 		return err
