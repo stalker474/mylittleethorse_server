@@ -204,14 +204,12 @@ func updateRaceData(race *RaceData) (bool, error) {
 	changed := !bytes.Equal(now, original)
 	//the race data changed, check if its complete now
 	race.Complete = true
-	if changed {
-		for _, bet := range race.Bets {
-			if contains(race.WinnerHorses, bet.Horse) || race.Refunded {
-				//this bet was won or was refunded
-				if !contains2(race.Withdraws, bet.From) {
-					race.Complete = false
-					break
-				}
+	for _, bet := range race.Bets {
+		if contains(race.WinnerHorses, bet.Horse) || race.Refunded {
+			//this bet was won or was refunded
+			if !contains2(race.Withdraws, bet.From) {
+				race.Complete = false
+				break
 			}
 		}
 	}
