@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
@@ -23,6 +24,9 @@ var refreshRate int64 = 10
 var wg sync.WaitGroup
 
 var saveNeeded uint32
+
+var concurrency = 10
+var sem = make(chan bool, concurrency)
 
 func main() {
 	port := os.Getenv("PORT")
@@ -99,19 +103,15 @@ func fetchNewData() bool {
 		server.data.mux.Unlock()
 	}
 	atomic.AddUint64(&ops, uint64(len(server.data.racesData)))
-	counter := 0
-	for raceNumber := range server.data.racesData {
-		wg.Add(1)
-		counter++
-		go fetchRaceData(raceNumber)
 
-		if counter > 10 {
-			wg.Wait()
-			counter = 0
-		}
+	for raceNumber := range server.data.racesData {
+		sem <- true
+		go fetchRaceData(raceNumber)
 	}
 
-	wg.Wait()
+	for i := 0; i < cap(sem); i++ {
+		sem <- true
+	}
 
 	log.Println("DONE")
 
@@ -119,7 +119,7 @@ func fetchNewData() bool {
 }
 
 func fetchRaceData(raceNumber uint32) {
-	defer wg.Done()
+	defer func() { <-sem }()
 	server.data.mux.Lock()
 	race, _ := server.data.racesData[raceNumber]
 	server.data.mux.Unlock()
@@ -167,11 +167,9 @@ func updateRaceData(race *RaceData) (bool, error) {
 		return false, err
 	}
 
-	conn, err := ethclient.Dial("wss://mainnet.infura.io/_ws")
+	conn, err := ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
-	} else {
-		defer conn.Close()
 	}
 
 	//add a version number if doesnt exist
@@ -188,6 +186,8 @@ func updateRaceData(race *RaceData) (bool, error) {
 		}
 	}
 
+	conn.Close()
+
 	err = errors.New("dummyError")
 	for err != nil {
 		if strings.Compare(race.Version, "0.2.2") == 0 {
@@ -199,10 +199,6 @@ func updateRaceData(race *RaceData) (bool, error) {
 		}
 		if err != nil {
 			log.Println("#", race.RaceNumber, " Error : ", err)
-			conn, err = ethclient.Dial("wss://mainnet.infura.io/_ws")
-			if err != nil {
-				log.Println("#", race.RaceNumber, " Failed to reconnect : ", err)
-			}
 		}
 	}
 
@@ -227,7 +223,7 @@ func updateRaceData(race *RaceData) (bool, error) {
 }
 
 func updateRaceData022(race *RaceData) error {
-	conn, err := ethclient.Dial("wss://mainnet.infura.io/_ws")
+	conn, err := ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
 	} else {
@@ -250,14 +246,16 @@ func updateRaceData022(race *RaceData) error {
 	if err != nil {
 		return err
 	}
-	deposits, err := contract.Betting022Filterer.FilterDeposit(nil)
-	if err != nil {
-		return err
+	deposits, err := contract.Betting022Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	for err != nil {
+		log.Println("#", race.RaceNumber, " Error : ", err)
+		deposits, err = contract.Betting022Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer deposits.Close()
-	withdraws, err := contract.Betting022Filterer.FilterWithdraw(nil)
-	if err != nil {
-		return err
+	withdraws, err := contract.Betting022Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	for err != nil {
+		log.Println("#", race.RaceNumber, " Error : ", err)
+		withdraws, err = contract.Betting022Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer withdraws.Close()
 
@@ -307,7 +305,7 @@ func updateRaceData022(race *RaceData) error {
 }
 
 func updateRaceData023(race *RaceData) error {
-	conn, err := ethclient.Dial("wss://mainnet.infura.io/_ws")
+	conn, err := ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
 	} else {
@@ -330,19 +328,22 @@ func updateRaceData023(race *RaceData) error {
 	if err != nil {
 		return err
 	}
-	deposits, err := contract.Betting023Filterer.FilterDeposit(nil)
-	if err != nil {
-		return err
+	deposits, err := contract.Betting023Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	for err != nil {
+		log.Println("#", race.RaceNumber, " Error : ", err)
+		deposits, err = contract.Betting023Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer deposits.Close()
-	withdraws, err := contract.Betting023Filterer.FilterWithdraw(nil)
-	if err != nil {
-		return err
+	withdraws, err := contract.Betting023Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	for err != nil {
+		log.Println("#", race.RaceNumber, " Error : ", err)
+		withdraws, err = contract.Betting023Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer withdraws.Close()
-	refunds, err := contract.Betting023Filterer.FilterRefundEnabled(nil)
-	if err != nil {
-		return err
+	refunds, err := contract.Betting023Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	for err != nil {
+		log.Println("#", race.RaceNumber, " Error : ", err)
+		refunds, err = contract.Betting023Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer refunds.Close()
 
@@ -394,7 +395,7 @@ func updateRaceData023(race *RaceData) error {
 }
 
 func updateRaceData024(race *RaceData) error {
-	conn, err := ethclient.Dial("wss://mainnet.infura.io/_ws")
+	conn, err := ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
 	} else {
@@ -417,19 +418,22 @@ func updateRaceData024(race *RaceData) error {
 	if err != nil {
 		return err
 	}
-	deposits, err := contract.Betting024Filterer.FilterDeposit(nil)
-	if err != nil {
-		return err
+	deposits, err := contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	for err != nil {
+		log.Println("#", race.RaceNumber, " Error deposits: ", err)
+		deposits, err = contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer deposits.Close()
-	withdraws, err := contract.Betting024Filterer.FilterWithdraw(nil)
-	if err != nil {
-		return err
+	withdraws, err := contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	for err != nil {
+		log.Println("#", race.RaceNumber, " Error withdraws: ", err)
+		withdraws, err = contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer withdraws.Close()
-	refunds, err := contract.Betting024Filterer.FilterRefundEnabled(nil)
-	if err != nil {
-		return err
+	refunds, err := contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	for err != nil {
+		log.Println("#", race.RaceNumber, " Error refunds: ", err)
+		refunds, err = contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer refunds.Close()
 
