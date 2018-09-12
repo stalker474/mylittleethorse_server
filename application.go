@@ -99,9 +99,19 @@ func fetchNewData() bool {
 		server.data.mux.Unlock()
 	}
 	atomic.AddUint64(&ops, uint64(len(server.data.racesData)))
+	counter := 0
 	for raceNumber := range server.data.racesData {
-		fetchRaceData(raceNumber)
+		wg.Add(1)
+		counter++
+		go fetchRaceData(raceNumber)
+
+		if counter > 10 {
+			wg.Wait()
+			counter = 0
+		}
 	}
+
+	wg.Wait()
 
 	log.Println("DONE")
 
@@ -109,6 +119,7 @@ func fetchNewData() bool {
 }
 
 func fetchRaceData(raceNumber uint32) {
+	defer wg.Done()
 	conn, err := ethclient.Dial("wss://mainnet.infura.io/_ws")
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
