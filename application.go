@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -19,9 +20,9 @@ var server *Server
 
 var ops uint64
 var refreshRate int64 = 10
+var wg sync.WaitGroup
 
 var saveNeeded uint32
-var conn *ethclient.Client
 
 func main() {
 	port := os.Getenv("PORT")
@@ -48,14 +49,6 @@ func main() {
 
 func updateCache() {
 	for true {
-		var err error
-		conn, err = ethclient.Dial("wss://mainnet.infura.io/_ws")
-		if err != nil {
-			log.Fatalf("Failed to init node: %v", err)
-		} else {
-			defer conn.Close()
-		}
-
 		log.Println("fetching new data...")
 		if !fetchNewData() {
 			log.Println("No changes...")
@@ -116,13 +109,19 @@ func fetchNewData() bool {
 }
 
 func fetchRaceData(raceNumber uint32) {
+	conn, err := ethclient.Dial("wss://mainnet.infura.io/_ws")
+	if err != nil {
+		log.Fatalf("Failed to init node: %v", err)
+	} else {
+		defer conn.Close()
+	}
 	server.data.mux.Lock()
 	race, _ := server.data.racesData[raceNumber]
 	server.data.mux.Unlock()
 	//Complete flag marks a race with all data up to date and impossible to change
 	//Such as all winners withdrew their winnings
 	if !race.Complete {
-		changed, err := updateRaceData(&race)
+		changed, err := updateRaceData(&race, conn)
 		if err != nil {
 			log.Println("Failed: race #", race.RaceNumber)
 		} else {
@@ -157,7 +156,7 @@ func contains2(s []Withdraw, e string) bool {
 	return false
 }
 
-func updateRaceData(race *RaceData) (bool, error) {
+func updateRaceData(race *RaceData, conn *ethclient.Client) (bool, error) {
 	original, err := json.Marshal(race)
 	if err != nil {
 		return false, err
@@ -180,11 +179,11 @@ func updateRaceData(race *RaceData) (bool, error) {
 	err = errors.New("dummyError")
 	for err != nil {
 		if strings.Compare(race.Version, "0.2.2") == 0 {
-			err = updateRaceData022(race)
+			err = updateRaceData022(race, conn)
 		} else if strings.Compare(race.Version, "0.2.3") == 0 {
-			err = updateRaceData023(race)
+			err = updateRaceData023(race, conn)
 		} else {
-			err = updateRaceData024(race)
+			err = updateRaceData024(race, conn)
 		}
 		if err != nil {
 			log.Println("#", race.RaceNumber, " Error : ", err)
@@ -215,7 +214,7 @@ func updateRaceData(race *RaceData) (bool, error) {
 	return changed, err
 }
 
-func updateRaceData022(race *RaceData) error {
+func updateRaceData022(race *RaceData, conn *ethclient.Client) error {
 	contract, err := NewBetting022(common.HexToAddress(race.ContractID), conn)
 	if err != nil {
 		return err
@@ -289,7 +288,7 @@ func updateRaceData022(race *RaceData) error {
 	return nil
 }
 
-func updateRaceData023(race *RaceData) error {
+func updateRaceData023(race *RaceData, conn *ethclient.Client) error {
 	contract, err := NewBetting023(common.HexToAddress(race.ContractID), conn)
 	if err != nil {
 		return err
@@ -370,7 +369,7 @@ func updateRaceData023(race *RaceData) error {
 	return nil
 }
 
-func updateRaceData024(race *RaceData) error {
+func updateRaceData024(race *RaceData, conn *ethclient.Client) error {
 	contract, err := NewBetting024(common.HexToAddress(race.ContractID), conn)
 	if err != nil {
 		return err
