@@ -1,13 +1,13 @@
 branch-defaults:
   master:
-    environment: MleApi-env
+    environment: mle-api2
 environment-defaults:
   MleApi-env:
     branch: null
     repository: null
 global:
   application_name: mle-api
-  default_ec2_keyname: null
+  default_ec2_keyname: antonhome
   default_platform: arn:aws:elasticbeanstalk:us-east-2::platform/Go 1 running on 64bit
     Amazon Linux/2.8.3
   default_region: us-east-2
