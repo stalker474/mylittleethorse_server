@@ -80,7 +80,6 @@ func fetchNewData() bool {
 		log.Fatal("Error :", err)
 		return false
 	}
-	log.Println("a1")
 	//make a single list of bridge + ours data
 	for _, v := range races {
 		raceNumber, err := strconv.Atoi(v.RaceNumber)
@@ -88,7 +87,6 @@ func fetchNewData() bool {
 			log.Fatal("Error :", err)
 			return false
 		}
-		log.Println("a2")
 		server.data.mux.Lock()
 		_, contains := server.data.racesData[uint32(raceNumber)]
 		//is this a race we dont have in our list yet?
@@ -97,26 +95,26 @@ func fetchNewData() bool {
 			server.data.racesData[uint32(raceNumber)], err = v.toRaceData()
 			if err != nil {
 				log.Fatal("Error :", err)
-				return false
 			}
 		}
 		server.data.mux.Unlock()
 	}
-
-	log.Println("a3")
 
 	//select non complete races
 	//Complete flag marks a race with all data up to date and impossible to change
 	//Such as all winners withdrew their winnings
 	var racesToUpdate []uint32
 	server.data.mux.Lock()
+	log.Println("a1")
 	for raceNumber, race := range server.data.racesData {
 		if !race.Complete {
+			log.Println("a2")
 			racesToUpdate = append(racesToUpdate, raceNumber)
 		}
 	}
 	atomic.AddUint64(&ops, uint64(len(racesToUpdate)))
 	server.data.mux.Unlock()
+	log.Println("a3")
 	racesToUpdate = racesToUpdate[0:2]
 	for _, val := range racesToUpdate {
 		sem <- true
