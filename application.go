@@ -8,7 +8,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -21,7 +20,6 @@ var server *Server
 
 var ops uint64
 var refreshRate int64 = 10
-var wg sync.WaitGroup
 
 var saveNeeded uint32
 
@@ -115,6 +113,7 @@ func fetchNewData() bool {
 	}
 	atomic.AddUint64(&ops, uint64(len(racesToUpdate)))
 	server.data.mux.Unlock()
+	racesToUpdate = racesToUpdate[0:10]
 	for _, val := range racesToUpdate {
 		sem <- true
 		go fetchRaceData(val)
@@ -131,11 +130,10 @@ func fetchNewData() bool {
 
 func fetchRaceData(raceNumber uint32) {
 	defer func() { <-sem }()
+	log.Println("Fetching race #", raceNumber)
 	server.data.mux.Lock()
 	race, _ := server.data.racesData[raceNumber]
 	server.data.mux.Unlock()
-
-	log.Println("Fetching race #", raceNumber)
 
 	changed, err := updateRaceData(&race)
 	if err != nil {

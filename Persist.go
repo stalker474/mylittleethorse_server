@@ -81,7 +81,9 @@ func NewPersistObject() (p *PersistObject) {
 
 // Save blabla
 func (p *PersistObject) save() error {
+	p.mux.Lock()
 	cache := NewCache(p.racesData, 0, 99999)
+	p.mux.Unlock()
 	resp, err := json.Marshal(cache)
 	if err != nil {
 		return err
@@ -97,7 +99,9 @@ func (p *PersistObject) load() error {
 	}
 	var cache Cache
 	err = json.Unmarshal(jsonText, &cache)
+	p.mux.Lock()
 	p.racesData = cache.toMap()
+	p.mux.Unlock()
 	return nil
 }
 
