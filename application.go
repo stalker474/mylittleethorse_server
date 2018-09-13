@@ -130,7 +130,6 @@ func fetchNewData() bool {
 }
 
 func fetchRaceData(raceNumber uint32) {
-	defer func() { <-sem }()
 	log.Println("Fetching race #", raceNumber)
 	server.data.mux.Lock()
 	race, _ := server.data.racesData[raceNumber]
@@ -150,6 +149,7 @@ func fetchRaceData(raceNumber uint32) {
 		log.Println("Success: race #", raceNumber)
 	}
 	atomic.AddUint64(&ops, ^uint64(0))
+	<-sem
 }
 
 func contains(s []string, e string) bool {
