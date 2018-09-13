@@ -105,18 +105,17 @@ func fetchNewData() bool {
 	//Such as all winners withdrew their winnings
 	var racesToUpdate []uint32
 	server.data.mux.Lock()
-	log.Println("a1")
 	for raceNumber, race := range server.data.racesData {
 		if !race.Complete {
-			log.Println("a2")
 			racesToUpdate = append(racesToUpdate, raceNumber)
 		}
 	}
 	atomic.AddUint64(&ops, uint64(len(racesToUpdate)))
 	server.data.mux.Unlock()
-	log.Println("a3")
+
 	racesToUpdate = racesToUpdate[0:2]
 	for _, val := range racesToUpdate {
+		log.Println("a3 :", val)
 		sem <- true
 		go fetchRaceData(val)
 	}
