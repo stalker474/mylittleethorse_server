@@ -104,9 +104,20 @@ func fetchNewData() bool {
 	}
 	atomic.AddUint64(&ops, uint64(len(server.data.racesData)))
 
-	for raceNumber := range server.data.racesData {
+	//select non complete races
+	//Complete flag marks a race with all data up to date and impossible to change
+	//Such as all winners withdrew their winnings
+	var racesToUpdate []uint32
+	server.data.mux.Lock()
+	for raceNumber, race := range server.data.racesData {
+		if !race.Complete {
+			racesToUpdate = append(racesToUpdate, raceNumber)
+		}
+	}
+	server.data.mux.Unlock()
+	for _, val := range racesToUpdate {
 		sem <- true
-		go fetchRaceData(raceNumber)
+		go fetchRaceData(val)
 	}
 
 	for i := 0; i < cap(sem); i++ {
@@ -123,22 +134,19 @@ func fetchRaceData(raceNumber uint32) {
 	server.data.mux.Lock()
 	race, _ := server.data.racesData[raceNumber]
 	server.data.mux.Unlock()
-	//Complete flag marks a race with all data up to date and impossible to change
-	//Such as all winners withdrew their winnings
-	if !race.Complete {
-		changed, err := updateRaceData(&race)
-		if err != nil {
-			log.Println("Failed: race #", race.RaceNumber)
-		} else {
-			if changed {
-				server.data.mux.Lock()
-				server.data.racesData[raceNumber] = race
-				server.data.mux.Unlock()
-				atomic.StoreUint32(&saveNeeded, 1)
-			}
 
-			log.Println("Success: race #", raceNumber)
+	changed, err := updateRaceData(&race)
+	if err != nil {
+		log.Println("Failed: race #", race.RaceNumber)
+	} else {
+		if changed {
+			server.data.mux.Lock()
+			server.data.racesData[raceNumber] = race
+			server.data.mux.Unlock()
+			atomic.StoreUint32(&saveNeeded, 1)
 		}
+
+		log.Println("Success: race #", raceNumber)
 	}
 	atomic.AddUint64(&ops, ^uint64(0))
 }
