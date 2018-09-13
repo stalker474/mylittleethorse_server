@@ -135,6 +135,8 @@ func fetchRaceData(raceNumber uint32) {
 	race, _ := server.data.racesData[raceNumber]
 	server.data.mux.Unlock()
 
+	log.Println("Fetching race #", raceNumber)
+
 	changed, err := updateRaceData(&race)
 	if err != nil {
 		log.Println("Failed: race #", race.RaceNumber)
@@ -307,6 +309,10 @@ func updateRaceData022(race *RaceData) error {
 	}
 
 	if (race.Bets == nil) || (race.WinnerHorses == nil) && (strings.Compare(race.Active, "Closed") == 0) {
+		log.Println("Refunded detected for race #", race.RaceNumber)
+		log.Println("Bets count:", len(race.Bets))
+		log.Println("Winner horses:", len(race.WinnerHorses))
+		log.Println("Active:", race.Active)
 		race.Refunded = true
 	}
 	return nil
