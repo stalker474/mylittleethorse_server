@@ -154,8 +154,6 @@ func (s *Server) Serve(port string) error {
 
 		if !ok || len(keys[0]) < 1 {
 			fmt.Fprintln(w, "Missing method")
-			fmt.Fprintln(w, "updatedb : refreshes json cache data from current state")
-			fmt.Fprintln(w, "recache : refresh ALL data keeping only old ethorse bridge info")
 			fmt.Fprintln(w, "report : gives info about current update status")
 			return
 		}

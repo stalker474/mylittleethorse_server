@@ -306,7 +306,7 @@ func updateRaceData022(race *RaceData) error {
 		race.Withdraws = append(race.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
 	}
 
-	if race.Bets == nil || race.WinnerHorses == nil && race.Active == "Closed" {
+	if (race.Bets == nil) || (race.WinnerHorses == nil) && (strings.Compare(race.Active, "Closed") == 0) {
 		race.Refunded = true
 	}
 	return nil
@@ -395,10 +395,6 @@ func updateRaceData023(race *RaceData) error {
 	}
 
 	race.Refunded = refunds.Next()
-
-	if race.Bets == nil || race.WinnerHorses == nil && race.Active == "Closed" {
-		race.Refunded = true
-	}
 	return nil
 }
 
@@ -485,9 +481,5 @@ func updateRaceData024(race *RaceData) error {
 	}
 
 	race.Refunded = refunds.Next()
-
-	if race.Bets == nil || race.WinnerHorses == nil && race.Active == "Closed" {
-		race.Refunded = true
-	}
 	return nil
 }
