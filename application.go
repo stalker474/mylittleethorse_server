@@ -88,7 +88,7 @@ func fetchNewData() bool {
 			return false
 		}
 		server.data.mux.Lock()
-		_, contains := server.data.racesData[uint32(raceNumber)]
+		race, contains := server.data.racesData[uint32(raceNumber)]
 		//is this a race we dont have in our list yet?
 		if !contains {
 			//create it and append
@@ -96,6 +96,9 @@ func fetchNewData() bool {
 			if err != nil {
 				log.Fatal("Error :", err)
 			}
+		} else if strings.Compare(race.Active, v.Active) != 0 { //just update the current status
+			race.Active = v.Active
+			server.data.racesData[uint32(raceNumber)] = race
 		}
 		server.data.mux.Unlock()
 	}
