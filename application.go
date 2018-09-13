@@ -102,7 +102,6 @@ func fetchNewData() bool {
 		}
 		server.data.mux.Unlock()
 	}
-	atomic.AddUint64(&ops, uint64(len(server.data.racesData)))
 
 	//select non complete races
 	//Complete flag marks a race with all data up to date and impossible to change
@@ -114,6 +113,7 @@ func fetchNewData() bool {
 			racesToUpdate = append(racesToUpdate, raceNumber)
 		}
 	}
+	atomic.AddUint64(&ops, uint64(len(racesToUpdate)))
 	server.data.mux.Unlock()
 	for _, val := range racesToUpdate {
 		sem <- true
