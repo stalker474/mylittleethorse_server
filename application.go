@@ -263,12 +263,16 @@ func updateRaceData022(race *RaceData) error {
 	deposits, err := contract.Betting022Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error : ", err)
+		conn, _ = ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
+		contract, _ = NewBetting022(common.HexToAddress(race.ContractID), conn)
 		deposits, err = contract.Betting022Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer deposits.Close()
 	withdraws, err := contract.Betting022Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error : ", err)
+		conn, _ = ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
+		contract, _ = NewBetting022(common.HexToAddress(race.ContractID), conn)
 		withdraws, err = contract.Betting022Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer withdraws.Close()
@@ -349,18 +353,24 @@ func updateRaceData023(race *RaceData) error {
 	deposits, err := contract.Betting023Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error : ", err)
+		conn, _ = ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
+		contract, _ = NewBetting023(common.HexToAddress(race.ContractID), conn)
 		deposits, err = contract.Betting023Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer deposits.Close()
 	withdraws, err := contract.Betting023Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error : ", err)
+		conn, _ = ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
+		contract, _ = NewBetting023(common.HexToAddress(race.ContractID), conn)
 		withdraws, err = contract.Betting023Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer withdraws.Close()
 	refunds, err := contract.Betting023Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error : ", err)
+		conn, _ = ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
+		contract, _ = NewBetting023(common.HexToAddress(race.ContractID), conn)
 		refunds, err = contract.Betting023Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer refunds.Close()
@@ -435,18 +445,24 @@ func updateRaceData024(race *RaceData) error {
 	deposits, err := contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error deposits: ", err)
+		conn, _ = ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
+		contract, _ = NewBetting024(common.HexToAddress(race.ContractID), conn)
 		deposits, err = contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer deposits.Close()
 	withdraws, err := contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error withdraws: ", err)
+		conn, _ = ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
+		contract, _ = NewBetting024(common.HexToAddress(race.ContractID), conn)
 		withdraws, err = contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer withdraws.Close()
 	refunds, err := contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error refunds: ", err)
+		conn, _ = ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
+		contract, _ = NewBetting024(common.HexToAddress(race.ContractID), conn)
 		refunds, err = contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
 	defer refunds.Close()
