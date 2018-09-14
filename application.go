@@ -181,7 +181,7 @@ func updateRaceData(race *RaceData) (bool, error) {
 		return false, err
 	}
 
-	conn, err := ethclient.Dial("wss://mainnet.infura.io/ws")
+	conn, err := ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
 	}
@@ -237,7 +237,7 @@ func updateRaceData(race *RaceData) (bool, error) {
 }
 
 func updateRaceData022(race *RaceData) error {
-	conn, err := ethclient.Dial("wss://mainnet.infura.io/ws")
+	conn, err := ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
 	} else {
@@ -323,7 +323,7 @@ func updateRaceData022(race *RaceData) error {
 }
 
 func updateRaceData023(race *RaceData) error {
-	conn, err := ethclient.Dial("wss://mainnet.infura.io/ws")
+	conn, err := ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
 	} else {
@@ -409,7 +409,7 @@ func updateRaceData023(race *RaceData) error {
 }
 
 func updateRaceData024(race *RaceData) error {
-	conn, err := ethclient.Dial("wss://mainnet.infura.io/ws")
+	conn, err := ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
 	}
@@ -432,7 +432,7 @@ func updateRaceData024(race *RaceData) error {
 	}
 
 	conn.Close()
-	conn, err = ethclient.Dial("wss://mainnet.infura.io/ws")
+	conn, err = ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
 	if err != nil {
 		log.Fatalf("Failed to init node 2: %v", err)
 	}
