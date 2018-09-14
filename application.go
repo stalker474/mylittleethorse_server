@@ -430,6 +430,16 @@ func updateRaceData024(race *RaceData) error {
 	if err != nil {
 		return err
 	}
+
+	conn.Close()
+	conn, err = ethclient.Dial("wss://mainnet.infura.io/_ws")
+	if err != nil {
+		log.Fatalf("Failed to init node: %v", err)
+	}
+	contract, err = NewBetting024(common.HexToAddress(race.ContractID), conn)
+	if err != nil {
+		return err
+	}
 	deposits, err := contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error deposits: ", err)
