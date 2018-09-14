@@ -440,6 +440,7 @@ func updateRaceData024(race *RaceData) error {
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 	log.Println("New")
 	deposits, err := contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	for err != nil {
