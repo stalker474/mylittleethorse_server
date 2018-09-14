@@ -434,7 +434,7 @@ func updateRaceData024(race *RaceData) error {
 	conn.Close()
 	conn, err = ethclient.Dial("wss://mainnet.infura.io/_ws")
 	if err != nil {
-		log.Fatalf("Failed to init node: %v", err)
+		log.Fatalf("Failed to init node 2: %v", err)
 	}
 	contract, err = NewBetting024(common.HexToAddress(race.ContractID), conn)
 	if err != nil {
