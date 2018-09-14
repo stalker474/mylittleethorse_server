@@ -77,7 +77,7 @@ func fetchNewData() bool {
 	log.Println("fetching ethorse bridge archive race list")
 	races, err = fetchArchive()
 	if err != nil {
-		log.Fatal("Error :", err)
+		log.Println("Error :", err)
 		return false
 	}
 	//make a single list of bridge + ours data
