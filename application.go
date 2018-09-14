@@ -260,16 +260,18 @@ func updateRaceData022(race *RaceData) error {
 	if err != nil {
 		return err
 	}
-	deposits, err := contract.Betting022Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	firstBlock := uint64(5400000)
+	lastBlock := uint64(5900000)
+	deposits, err := contract.Betting022Filterer.FilterDeposit(&bind.FilterOpts{Start: firstBlock, End: &lastBlock, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error : ", err)
-		deposits, err = contract.Betting022Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+		deposits, err = contract.Betting022Filterer.FilterDeposit(&bind.FilterOpts{Start: firstBlock, End: &lastBlock, Context: nil})
 	}
 	defer deposits.Close()
-	withdraws, err := contract.Betting022Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	withdraws, err := contract.Betting022Filterer.FilterWithdraw(&bind.FilterOpts{Start: firstBlock, End: &lastBlock, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error : ", err)
-		withdraws, err = contract.Betting022Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+		withdraws, err = contract.Betting022Filterer.FilterWithdraw(&bind.FilterOpts{Start: firstBlock, End: &lastBlock, Context: nil})
 	}
 	defer withdraws.Close()
 
@@ -346,22 +348,24 @@ func updateRaceData023(race *RaceData) error {
 	if err != nil {
 		return err
 	}
-	deposits, err := contract.Betting023Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	firstBlock := uint64(5800000)
+	lastBlock := uint64(6199089)
+	deposits, err := contract.Betting023Filterer.FilterDeposit(&bind.FilterOpts{Start: firstBlock, End: &lastBlock, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error : ", err)
-		deposits, err = contract.Betting023Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+		deposits, err = contract.Betting023Filterer.FilterDeposit(&bind.FilterOpts{Start: firstBlock, End: &lastBlock, Context: nil})
 	}
 	defer deposits.Close()
-	withdraws, err := contract.Betting023Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	withdraws, err := contract.Betting023Filterer.FilterWithdraw(&bind.FilterOpts{Start: firstBlock, End: &lastBlock, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error : ", err)
-		withdraws, err = contract.Betting023Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+		withdraws, err = contract.Betting023Filterer.FilterWithdraw(&bind.FilterOpts{Start: firstBlock, End: &lastBlock, Context: nil})
 	}
 	defer withdraws.Close()
-	refunds, err := contract.Betting023Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+	refunds, err := contract.Betting023Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: firstBlock, End: &lastBlock, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error : ", err)
-		refunds, err = contract.Betting023Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
+		refunds, err = contract.Betting023Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: firstBlock, End: &lastBlock, Context: nil})
 	}
 	defer refunds.Close()
 
@@ -431,33 +435,23 @@ func updateRaceData024(race *RaceData) error {
 		return err
 	}
 
-	conn.Close()
-	conn, err = ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
-	if err != nil {
-		log.Fatalf("Failed to init node 2: %v", err)
-	}
-	contract, err = NewBetting024(common.HexToAddress(race.ContractID), conn)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	log.Println("New")
-	deposits, err := contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	firstBlock := uint64(6100000)
+	deposits, err := contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: firstBlock, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error deposits: ", err)
-		deposits, err = contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+		deposits, err = contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: firstBlock, End: nil, Context: nil})
 	}
 	//defer deposits.Close()
-	withdraws, err := contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	withdraws, err := contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: firstBlock, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error withdraws: ", err)
-		withdraws, err = contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+		withdraws, err = contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: firstBlock, End: nil, Context: nil})
 	}
 	//defer withdraws.Close()
-	refunds, err := contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+	refunds, err := contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: firstBlock, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error refunds: ", err)
-		refunds, err = contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 6000000, End: nil, Context: nil})
+		refunds, err = contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: firstBlock, End: nil, Context: nil})
 	}
 	//defer refunds.Close()
 
