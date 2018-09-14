@@ -437,19 +437,19 @@ func updateRaceData024(race *RaceData) error {
 		log.Println("#", race.RaceNumber, " Error deposits: ", err)
 		deposits, err = contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
-	defer deposits.Close()
+	//defer deposits.Close()
 	withdraws, err := contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error withdraws: ", err)
 		withdraws, err = contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
-	defer withdraws.Close()
+	//defer withdraws.Close()
 	refunds, err := contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error refunds: ", err)
 		refunds, err = contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: 5000000, End: nil, Context: nil})
 	}
-	defer refunds.Close()
+	//defer refunds.Close()
 
 	if btcWon || ltcWon || ethWon {
 		race.WinnerHorses = nil
