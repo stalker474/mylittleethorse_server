@@ -137,8 +137,8 @@ func (p *PersistObject) toZJSON(from uint32, to uint32) (s string, err error) {
 }
 
 func (p *PersistObject) toCharts(from uint64, to uint64) (s string, err error) {
-	//var buf bytes.Buffer
-	//zw := gzip.NewWriter(&buf)
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
 
 	stats := Stats{}
 	stats.CoinInfo = make(map[string]CoinInfo)
@@ -229,17 +229,16 @@ func (p *PersistObject) toCharts(from uint64, to uint64) (s string, err error) {
 
 	data, err := json.Marshal(stats)
 
-	/*_, err = zw.Write([]byte(data))
+	_, err = zw.Write([]byte(data))
 	if err != nil {
 		return s, err
 	}
 
 	if err := zw.Close(); err != nil {
 		return s, err
-	}*/
+	}
 
-	//return buf.String(), err
-	return string(data), err
+	return buf.String(), err
 }
 
 func (p *PersistObject) toCSV(from uint32, to uint32) (s string, err error) {
