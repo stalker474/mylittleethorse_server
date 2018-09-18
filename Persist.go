@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"sort"
 	"strconv"
@@ -123,6 +124,95 @@ func (p *PersistObject) toZJSON(from uint32, to uint32) (s string, err error) {
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
 	data, err := p.toJSON(from, to)
+
+	_, err = zw.Write([]byte(data))
+	if err != nil {
+		return s, err
+	}
+
+	if err := zw.Close(); err != nil {
+		return s, err
+	}
+
+	return buf.String(), err
+}
+
+func (p *PersistObject) toCharts(from uint64, to uint64) (s string, err error) {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+
+	stats := Stats{}
+	stats.CoinInfo = make(map[string]CoinInfo)
+	stats.CoinInfo["BTC"] = CoinInfo{WinsCount: 0}
+	stats.CoinInfo["ETH"] = CoinInfo{WinsCount: 0}
+	stats.CoinInfo["LTC"] = CoinInfo{WinsCount: 0}
+
+	playerCount := make(map[string]uint32)
+	dayPlayerCount := make(map[string]map[string]uint32)
+	days := make(map[string]Day)
+	stats.PeriodBegin = from
+	stats.PeriodEnd = to
+	seedingAddr := "0x1F92771237Bd5eae04e91B4B6F1d1a78D41565a2"
+
+	p.mux.Lock()
+	for _, race := range server.data.racesData {
+		//count only non refunded closed races
+		if race.Date >= from && race.Date <= to {
+			if !race.Refunded && (strings.Compare(race.Active, "Closed") == 0) {
+				//local to race data
+				coinVolume := make(map[string]float32)
+				coinBetsCount := make(map[string]uint32)
+
+				tm := time.Unix(int64(race.Date), 0)
+				formattedDay := fmt.Sprintf("%d-%02d-%02d", tm.Year(), tm.Month(), tm.Day())
+				day, exists := days[formattedDay]
+				if !exists {
+					day = Day{}
+					day.Coins = make(map[string]Coin)
+				}
+				day.Label = formattedDay
+				stats.TotalRaces++
+				stats.TotalVolume += race.Volume
+
+				for _, horse := range race.WinnerHorses {
+					stats.CoinInfo[horse] = CoinInfo{WinsCount: stats.CoinInfo[horse].WinsCount}
+				}
+				userVolume := float32(0)
+				for _, bet := range race.Bets {
+					playerCount[bet.From]++
+					dayPlayerCount[formattedDay][bet.From]++
+					coinVolume[bet.Horse] += bet.Value
+					coinBetsCount[bet.Horse]++
+					if strings.Compare(bet.From, seedingAddr) != 0 {
+						userVolume += bet.Value
+					}
+				}
+
+				day.Volume += race.Volume
+				day.UserVolume += userVolume
+
+				for coin, value := range coinVolume {
+					c, _ := day.Coins[coin]
+					c.Volume += value
+					c.BetsCount += coinBetsCount[coin]
+					day.Coins[coin] = c
+				}
+			}
+		}
+	}
+	p.mux.Unlock()
+
+	for _, day := range days {
+		stats.Days = append(stats.Days, day)
+	}
+	stats.TotalPlayersCount = uint32(len(playerCount))
+	for formattedDay, coins := range dayPlayerCount {
+		day, _ := days[formattedDay]
+		day.PlayersCount = uint32(len(coins))
+		days[formattedDay] = day
+	}
+
+	data, err := json.Marshal(stats)
 
 	_, err = zw.Write([]byte(data))
 	if err != nil {

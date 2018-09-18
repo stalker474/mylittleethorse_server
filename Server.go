@@ -44,7 +44,7 @@ func enableDecoratorsGz(w *http.ResponseWriter) {
 	(*w).Header().Set("Content-Type", "text/javascript")
 }
 
-func getFromAndTo(r *http.Request) (from uint32, to uint32, err error) {
+func getFromAndTo(r *http.Request) (from uint64, to uint64, err error) {
 	keysFrom, okFrom := r.URL.Query()["from"]
 	keysTo, okTo := r.URL.Query()["to"]
 
@@ -57,14 +57,14 @@ func getFromAndTo(r *http.Request) (from uint32, to uint32, err error) {
 			return 0, 0, err
 		}
 
-		from = uint32(val)
+		from = uint64(val)
 	}
 	if okTo && (len(keysTo) > 0) {
 		val, err := strconv.ParseInt(keysTo[0], 10, 32)
 		if err != nil {
 			return 0, 0, err
 		}
-		to = uint32(val)
+		to = uint64(val)
 	}
 
 	return from, to, nil
@@ -85,7 +85,7 @@ func (s *Server) Serve(port string) error {
 		if exists {
 			fmt.Fprintln(w, s.cache[req])
 		} else {
-			data, err := s.data.toJSON(from, to)
+			data, err := s.data.toJSON(uint32(from), uint32(to))
 			if err != nil {
 				fmt.Fprintln(w, err.Error())
 			} else {
@@ -110,7 +110,7 @@ func (s *Server) Serve(port string) error {
 		if exists {
 			fmt.Fprintln(w, s.cache[req])
 		} else {
-			data, err := s.data.toZJSON(from, to)
+			data, err := s.data.toZJSON(uint32(from), uint32(to))
 			if err != nil {
 				fmt.Fprintln(w, err.Error())
 			} else {
@@ -135,7 +135,32 @@ func (s *Server) Serve(port string) error {
 		if exists {
 			fmt.Fprintln(w, s.cache[req])
 		} else {
-			data, err := s.data.toCSV(from, to)
+			data, err := s.data.toCSV(uint32(from), uint32(to))
+			if err != nil {
+				fmt.Fprintln(w, err.Error())
+			} else {
+				str := string(data[:])
+				fmt.Fprintln(w, str)
+				s.cache[req] = str
+			}
+		}
+		s.cacheMux.Unlock()
+	})
+
+	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
+		enableDecoratorsGz(&w)
+		enableCors(&w)
+		from, to, err := getFromAndTo(r)
+		if err != nil {
+			fmt.Fprintln(w, err.Error())
+		}
+		req := "stats" + strconv.Itoa(int(from)) + "_" + strconv.Itoa(int(to))
+		s.cacheMux.Lock()
+		_, exists := s.cache[req]
+		if exists {
+			fmt.Fprintln(w, s.cache[req])
+		} else {
+			data, err := s.data.toCharts(from, to)
 			if err != nil {
 				fmt.Fprintln(w, err.Error())
 			} else {
