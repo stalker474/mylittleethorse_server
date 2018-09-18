@@ -49,10 +49,10 @@ func getFromAndTo(r *http.Request) (from uint64, to uint64, err error) {
 	keysTo, okTo := r.URL.Query()["to"]
 
 	from = 0
-	to = 9999
+	to = 9999999999999999999
 
 	if okFrom && (len(keysFrom) > 0) {
-		val, err := strconv.ParseInt(keysFrom[0], 10, 32)
+		val, err := strconv.ParseInt(keysFrom[0], 10, 64)
 		if err != nil {
 			return 0, 0, err
 		}
@@ -60,7 +60,7 @@ func getFromAndTo(r *http.Request) (from uint64, to uint64, err error) {
 		from = uint64(val)
 	}
 	if okTo && (len(keysTo) > 0) {
-		val, err := strconv.ParseInt(keysTo[0], 10, 32)
+		val, err := strconv.ParseInt(keysTo[0], 10, 64)
 		if err != nil {
 			return 0, 0, err
 		}
