@@ -163,7 +163,7 @@ func (p *PersistObject) toCharts(from uint64, to uint64) (s string, err error) {
 				coinBetsCount := make(map[string]uint32)
 
 				tm := time.Unix(int64(race.Date), 0)
-				const format = "2018 Jan 02"
+				const format = "Jan 02 2006"
 				formattedDay := tm.Format(format)
 				day, exists := days[formattedDay]
 				if !exists {
@@ -180,11 +180,15 @@ func (p *PersistObject) toCharts(from uint64, to uint64) (s string, err error) {
 				stats.TotalVolume += race.Volume
 
 				for _, horse := range race.WinnerHorses {
-					stats.CoinInfo[horse] = CoinInfo{WinsCount: stats.CoinInfo[horse].WinsCount}
+					stats.CoinInfo[horse] = CoinInfo{WinsCount: stats.CoinInfo[horse].WinsCount + 1}
 				}
 				userVolume := float32(0)
 				for _, bet := range race.Bets {
 					playerCount[bet.From]++
+					_, exists := dayPlayerCount[formattedDay]
+					if !exists {
+						dayPlayerCount[formattedDay] = make(map[string]uint32)
+					}
 					dayPlayerCount[formattedDay][bet.From]++
 					coinVolume[bet.Horse] += bet.Value
 					coinBetsCount[bet.Horse]++
@@ -202,6 +206,8 @@ func (p *PersistObject) toCharts(from uint64, to uint64) (s string, err error) {
 					c.BetsCount += coinBetsCount[coin]
 					day.Coins[coin] = c
 				}
+
+				days[formattedDay] = day
 			}
 		}
 	}
@@ -218,7 +224,7 @@ func (p *PersistObject) toCharts(from uint64, to uint64) (s string, err error) {
 		stats.Days = append(stats.Days, day)
 	}
 	sort.Slice(stats.Days, func(i, j int) bool {
-		return stats.Days[i].Date > stats.Days[j].Date
+		return stats.Days[i].Date < stats.Days[j].Date
 	})
 
 	data, err := json.Marshal(stats)
