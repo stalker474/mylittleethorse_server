@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"encoding/csv"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"sort"
 	"strconv"
@@ -164,13 +163,19 @@ func (p *PersistObject) toCharts(from uint64, to uint64) (s string, err error) {
 				coinBetsCount := make(map[string]uint32)
 
 				tm := time.Unix(int64(race.Date), 0)
-				formattedDay := fmt.Sprintf("%d-%02d-%02d", tm.Year(), tm.Month(), tm.Day())
+				const format = "2018 Jan 02"
+				formattedDay := tm.Format(format)
 				day, exists := days[formattedDay]
 				if !exists {
 					day = Day{}
 					day.Coins = make(map[string]Coin)
 				}
 				day.Label = formattedDay
+				dayTime, err := time.Parse(format, formattedDay)
+				if err != nil {
+					return "", err
+				}
+				day.Date = uint64(dayTime.Unix())
 				stats.TotalRaces++
 				stats.TotalVolume += race.Volume
 
@@ -202,15 +207,19 @@ func (p *PersistObject) toCharts(from uint64, to uint64) (s string, err error) {
 	}
 	p.mux.Unlock()
 
-	for _, day := range days {
-		stats.Days = append(stats.Days, day)
-	}
 	stats.TotalPlayersCount = uint32(len(playerCount))
 	for formattedDay, coins := range dayPlayerCount {
 		day, _ := days[formattedDay]
 		day.PlayersCount = uint32(len(coins))
 		days[formattedDay] = day
 	}
+
+	for _, day := range days {
+		stats.Days = append(stats.Days, day)
+	}
+	sort.Slice(stats.Days, func(i, j int) bool {
+		return stats.Days[i].Date > stats.Days[j].Date
+	})
 
 	data, err := json.Marshal(stats)
 
