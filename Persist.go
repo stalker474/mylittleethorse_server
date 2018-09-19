@@ -202,7 +202,7 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 	zw := gzip.NewWriter(&buf)
 
 	user := User{}
-	user.Address = strings.ToLower(address)
+	user.Address = address
 	betAmount := float32(0.0)
 	earnedAmount := float32(0.0)
 	wins := make(map[string]uint32)
@@ -237,7 +237,7 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 					//make sure this user exists in the ranks map for later
 					ranks[bet.From] = 0
 
-					if strings.Compare(strings.ToLower(bet.From), user.Address) == 0 {
+					if strings.Compare(bet.From, user.Address) == 0 {
 						participated = true
 						betAmount += bet.Value
 
@@ -262,7 +262,7 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 					}
 				}
 				for _, with := range race.Withdraws {
-					if strings.Compare(strings.ToLower(with.To), user.Address) == 0 {
+					if strings.Compare(with.To, user.Address) == 0 {
 						earnedAmount += with.Value
 					}
 				}
@@ -306,50 +306,53 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 		}
 	}
 
-	//handle achievements
+	if user.GamesCount > 0 {
+		//handle achievements
 
-	//achievement by games count
-	if user.GamesCount >= 100 {
-		user.Achievements = append(user.Achievements, Achievement{Label: "Whale"})
-	} else if user.GamesCount >= 50 {
-		user.Achievements = append(user.Achievements, Achievement{Label: "Addict"})
-	} else if user.GamesCount >= 10 {
-		user.Achievements = append(user.Achievements, Achievement{Label: "Gambler"})
+		//achievement by games count
+		if user.GamesCount >= 100 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "Whale"})
+		} else if user.GamesCount >= 50 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "Addict"})
+		} else if user.GamesCount >= 10 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "Gambler"})
+		}
+		//achievement by rank
+		if user.Rank == 1 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "Alpha and Omega"})
+		} else if user.Rank <= 3 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "Challenger"})
+		} else if user.Rank <= 10 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "I know what I'm doing"})
+		}
+		//achievement by winning streak
+		if longestWinStreak >= 10 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "This isn't gambling!!!"})
+		} else if longestWinStreak >= 5 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "How do you do it?!!"})
+		} else if longestWinStreak >= 3 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "I start to get this game!"})
+		}
+		//achievement by losing streak
+		if longestLossStreak >= 10 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "Just stop!!!"})
+		} else if longestLossStreak >= 5 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "Stop playing!"})
+		} else if longestLossStreak >= 3 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "Bad luck"})
+		}
+		//achievement based on bet type
+		if isTripleBettor {
+			user.Achievements = append(user.Achievements, Achievement{Label: "I take no risks"})
+		}
+		if isDoubleBettor {
+			user.Achievements = append(user.Achievements, Achievement{Label: "Hedging is key"})
+		}
+		if !isTripleBettor && !isDoubleBettor {
+			user.Achievements = append(user.Achievements, Achievement{Label: "One shot is enough"})
+		}
 	}
-	//achievement by rank
-	if user.Rank == 1 {
-		user.Achievements = append(user.Achievements, Achievement{Label: "Alpha and Omega"})
-	} else if user.Rank <= 3 {
-		user.Achievements = append(user.Achievements, Achievement{Label: "Challenger"})
-	} else if user.Rank <= 10 {
-		user.Achievements = append(user.Achievements, Achievement{Label: "I know what I'm doing"})
-	}
-	//achievement by winning streak
-	if longestWinStreak >= 10 {
-		user.Achievements = append(user.Achievements, Achievement{Label: "This isn't gambling!!!"})
-	} else if longestWinStreak >= 5 {
-		user.Achievements = append(user.Achievements, Achievement{Label: "How do you do it?!!"})
-	} else if longestWinStreak >= 3 {
-		user.Achievements = append(user.Achievements, Achievement{Label: "I start to get this game!"})
-	}
-	//achievement by losing streak
-	if longestLossStreak >= 10 {
-		user.Achievements = append(user.Achievements, Achievement{Label: "Just stop!!!"})
-	} else if longestLossStreak >= 5 {
-		user.Achievements = append(user.Achievements, Achievement{Label: "Stop playing!"})
-	} else if longestLossStreak >= 3 {
-		user.Achievements = append(user.Achievements, Achievement{Label: "Bad luck"})
-	}
-	//achievement based on bet type
-	if isTripleBettor {
-		user.Achievements = append(user.Achievements, Achievement{Label: "I take no risks"})
-	}
-	if isDoubleBettor {
-		user.Achievements = append(user.Achievements, Achievement{Label: "Hedging is key"})
-	}
-	if !isTripleBettor && !isDoubleBettor {
-		user.Achievements = append(user.Achievements, Achievement{Label: "One shot is enough"})
-	}
+
 	data, err := json.Marshal(user)
 
 	_, err = zw.Write([]byte(data))
