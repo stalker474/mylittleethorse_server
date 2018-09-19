@@ -356,7 +356,7 @@ func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
 	losses := make(map[string]uint32)
 	games := make(map[string]uint32)
 	ranks := make(map[string]float32)
-	wedgered := make(map[string]float32)
+	wagered := make(map[string]float32)
 	withdrawn := make(map[string]float32)
 
 	p.mux.Lock()
@@ -369,7 +369,7 @@ func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
 					betFrom := strings.ToLower(bet.From)
 					//make sure this user exists in the ranks map for later
 					ranks[betFrom] = 0
-					wedgered[betFrom] += bet.Value
+					wagered[betFrom] += bet.Value
 					//playersWon should be set to true if one of the players bet did win
 					if !playersWon[betFrom] {
 						playersWon[betFrom] = Contains(race.WinnerHorses, bet.Horse)
@@ -411,11 +411,18 @@ func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
 	})
 
 	var ranksList []Rank
-	for rank, user := range ranksArray {
+	rankValue := 0
+	for _, user := range ranksArray {
+		//only players with at least 5 games have a rank
+		rank := 0
+		if games[user.address] >= 5 {
+			rankValue++
+			rank = rankValue
+		}
 		ranksList = append(ranksList, Rank{
 			Address:     user.address,
-			Benefit:     wedgered[user.address] - withdrawn[user.address],
-			Rank:        uint32(rank + 1),
+			Benefit:     withdrawn[user.address] - wagered[user.address],
+			Rank:        uint32(rank),
 			WinsCount:   wins[user.address],
 			LossesCount: losses[user.address],
 			GamesCount:  games[user.address]})
