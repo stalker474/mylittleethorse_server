@@ -282,7 +282,9 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 
 	for _, u := range ranks {
 		if strings.Compare(u.Address, user.Address) == 0 {
-			user.Rank = u.Rank
+			user.RankCash = u.RankCash
+			user.RankWinLoss = u.RankWinLoss
+			user.RankWinner = u.RankWinner
 			user.GamesCount = u.GamesCount
 			user.Benefit = u.Benefit
 			user.WinsCount = u.WinsCount
@@ -302,12 +304,26 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 			user.Achievements = append(user.Achievements, Achievement{Label: "Gambler"})
 		}
 		//achievement by rank
-		if user.Rank == 1 {
+		if user.RankCash == 1 {
 			user.Achievements = append(user.Achievements, Achievement{Label: "Alpha and Omega"})
-		} else if user.Rank <= 3 {
+		} else if user.RankCash <= 3 {
 			user.Achievements = append(user.Achievements, Achievement{Label: "Challenger"})
-		} else if user.Rank <= 10 {
+		} else if user.RankCash <= 10 {
 			user.Achievements = append(user.Achievements, Achievement{Label: "I know what I'm doing"})
+		}
+		if user.RankWinLoss == 1 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "Professor"})
+		} else if user.RankWinLoss <= 3 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "Mathematician"})
+		} else if user.RankWinLoss <= 10 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "TA amateur"})
+		}
+		if user.RankWinner == 1 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "Golden boy"})
+		} else if user.RankWinner <= 3 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "Smart investor"})
+		} else if user.RankWinner <= 10 {
+			user.Achievements = append(user.Achievements, Achievement{Label: "Cash flow"})
 		}
 		//achievement by winning streak
 		if longestWinStreak >= 10 {
@@ -394,25 +410,47 @@ func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
 	p.mux.Unlock()
 
 	type usr struct {
-		address string
-		ratio   float32
+		address      string
+		ratioCash    float32
+		ratioWinLoss float32
+		ratioWinner  float32
 	}
 
 	//compute ranks of everyone based on win/loss ratio
 	var ranksArray []usr
 	for user := range ranks {
-		ranksArray = append(ranksArray, usr{address: user, ratio: float32(withdrawn[user]) / float32(wagered[user])})
+		ranksArray = append(ranksArray, usr{
+			address:      user,
+			ratioCash:    float32(withdrawn[user]) / float32(wagered[user]),
+			ratioWinLoss: float32(wins[user]) / float32(losses[user]),
+			ratioWinner:  float32(withdrawn[user]) - float32(wagered[user])})
 	}
 
 	//sort
+	var ranksCashArray []usr
+	var ranksWinLossArray []usr
+	var ranksWinnerArray []usr
+	for _, v := range ranksArray {
+		ranksCashArray = append(ranksCashArray, v)
+		ranksWinLossArray = append(ranksWinLossArray, v)
+		ranksWinnerArray = append(ranksWinnerArray, v)
+	}
 
-	sort.Slice(ranksArray, func(i, j int) bool {
-		return ranksArray[i].ratio > ranksArray[j].ratio
+	sort.Slice(ranksCashArray, func(i, j int) bool {
+		return ranksCashArray[i].ratioCash > ranksCashArray[j].ratioCash
+	})
+	sort.Slice(ranksWinLossArray, func(i, j int) bool {
+		return ranksWinLossArray[i].ratioWinLoss > ranksWinLossArray[j].ratioWinLoss
+	})
+	sort.Slice(ranksWinnerArray, func(i, j int) bool {
+		return ranksWinnerArray[i].ratioWinner > ranksWinnerArray[j].ratioWinner
 	})
 
 	var ranksList []Rank
+	ranksMap := make(map[string]*Rank)
+
 	rankValue := 0
-	for _, user := range ranksArray {
+	for _, user := range ranksWinLossArray {
 		//only players with at least 5 games have a rank
 		rank := 0
 		if games[user.address] >= 5 {
@@ -422,14 +460,37 @@ func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
 		ranksList = append(ranksList, Rank{
 			Address:     user.address,
 			Benefit:     withdrawn[user.address] - wagered[user.address],
-			Rank:        uint32(rank),
+			RankWinLoss: uint32(rank),
 			WinsCount:   wins[user.address],
 			LossesCount: losses[user.address],
 			GamesCount:  games[user.address]})
+		ranksMap[user.address] = &ranksList[len(ranksList)-1]
+	}
+
+	rankValue = 0
+	for _, user := range ranksCashArray {
+		//only players with at least 5 games have a rank
+		rank := 0
+		if games[user.address] >= 5 {
+			rankValue++
+			rank = rankValue
+		}
+		ranksMap[user.address].RankCash = uint32(rank)
+	}
+
+	rankValue = 0
+	for _, user := range ranksWinnerArray {
+		//only players with at least 5 games have a rank
+		rank := 0
+		if games[user.address] >= 5 {
+			rankValue++
+			rank = rankValue
+		}
+		ranksMap[user.address].RankCash = uint32(rank)
 	}
 
 	sort.Slice(ranksList, func(i, j int) bool {
-		return ranksList[i].Rank < ranksList[j].Rank
+		return ranksList[i].RankCash < ranksList[j].RankCash
 	})
 	return ranksList
 }

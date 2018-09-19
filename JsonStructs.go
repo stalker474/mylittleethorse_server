@@ -96,7 +96,9 @@ type Horsey struct {
 type User struct {
 	Address      string        `json:"address"`
 	GamesCount   uint32        `json:"games_count"`
-	Rank         uint32        `json:"rank"`
+	RankCash     uint32        `json:"rank_cash"`
+	RankWinLoss  uint32        `json:"rank_winloss"`
+	RankWinner   uint32        `json:"rank_winner"`
 	WinsCount    uint32        `json:"wins_count"`
 	LossesCount  uint32        `json:"losses_count"`
 	Benefit      float32       `json:"benefit"`
@@ -108,7 +110,9 @@ type User struct {
 type Rank struct {
 	Address     string  `json:"address"`
 	Benefit     float32 `json:"benefit"`
-	Rank        uint32  `json:"rank"`
+	RankCash    uint32  `json:"rank_cash"`
+	RankWinLoss uint32  `json:"rank_winloss"`
+	RankWinner  uint32  `json:"rank_winner"`
 	WinsCount   uint32  `json:"wins_count"`
 	LossesCount uint32  `json:"losses_count"`
 	GamesCount  uint32  `json:"games_count"`
