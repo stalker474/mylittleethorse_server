@@ -241,8 +241,12 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 					if strings.Compare(betFrom, user.Address) == 0 {
 						participated = true
 						betsCount[bet.Horse] = true
-						isTripleBettor = len(betsCount) > 2
-						isDoubleBettor = len(betsCount) > 1
+						if !isTripleBettor {
+							isTripleBettor = len(betsCount) > 2
+						}
+						if !isDoubleBettor {
+							isDoubleBettor = len(betsCount) > 1
+						}
 
 						if bet.Value > topBet {
 							topBet = bet.Value
