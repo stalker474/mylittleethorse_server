@@ -85,7 +85,7 @@ type Achievement struct {
 	Label string `json:"label"`
 }
 
-// Horse blablabla
+// Horsey blablabla
 type Horsey struct {
 	RaceNumber  uint32 `json:"race_number"`
 	RaceAddress string `json:"race_address"`
@@ -102,4 +102,14 @@ type User struct {
 	Benefit      float32       `json:"benefit"`
 	Achievements []Achievement `json:"achievements"`
 	Horseys      []Horsey      `json:"horseys"`
+}
+
+// Rank blablabla
+type Rank struct {
+	Address     string  `json:"address"`
+	Benefit     float32 `json:"benefit"`
+	Rank        uint32  `json:"rank"`
+	WinsCount   uint32  `json:"wins_count"`
+	LossesCount uint32  `json:"losses_count"`
+	GamesCount  uint32  `json:"games_count"`
 }

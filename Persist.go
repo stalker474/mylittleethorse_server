@@ -368,6 +368,91 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 	return buf.String(), err
 }
 
+func (p *PersistObject) getRanks(from uint64, to uint64) (s string, err error) {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+
+	wins := make(map[string]uint32)
+	losses := make(map[string]uint32)
+	games := make(map[string]uint32)
+	ranks := make(map[string]float32)
+	wedgered := make(map[string]float32)
+	withdrawn := make(map[string]float32)
+
+	p.mux.Lock()
+	for _, race := range server.data.racesData {
+		//count only non refunded closed races
+		if race.Date >= from && race.Date <= to {
+			if !race.Refunded && (strings.Compare(race.Active, "Closed") == 0) {
+				won := false
+				players := make(map[string]bool)
+				for _, bet := range race.Bets {
+					betFrom := strings.ToLower(bet.From)
+					players[betFrom] = true
+					wedgered[betFrom] += bet.Value
+					won = Contains(race.WinnerHorses, bet.Horse)
+					if won {
+						wins[betFrom]++
+					} else {
+						losses[betFrom]++
+					}
+					//make sure this user exists in the ranks map for later
+					ranks[betFrom] = 0
+				}
+				for _, with := range race.Withdraws {
+					withdrawn[strings.ToLower(with.To)] += with.Value
+				}
+				for player := range players {
+					games[player]++
+				}
+			}
+
+		}
+	}
+	p.mux.Unlock()
+
+	type usr struct {
+		address string
+		ratio   float32
+	}
+
+	//compute ranks of everyone based on win/loss ratio
+	var ranksArray []usr
+	for user := range ranks {
+		ranksArray = append(ranksArray, usr{address: user, ratio: float32(wins[user]) / float32(losses[user])})
+	}
+
+	//sort
+
+	sort.Slice(ranksArray, func(i, j int) bool {
+		return ranksArray[i].ratio < ranksArray[j].ratio
+	})
+
+	var ranksList []Rank
+	for rank, user := range ranksArray {
+		ranksList = append(ranksList, Rank{
+			Address:     user.address,
+			Benefit:     wedgered[user.address] - withdrawn[user.address],
+			Rank:        uint32(rank + 1),
+			WinsCount:   wins[user.address],
+			LossesCount: losses[user.address],
+			GamesCount:  games[user.address]})
+	}
+
+	data, err := json.Marshal(ranksList)
+
+	_, err = zw.Write([]byte(data))
+	if err != nil {
+		return s, err
+	}
+
+	if err := zw.Close(); err != nil {
+		return s, err
+	}
+
+	return buf.String(), err
+}
+
 func (p *PersistObject) toCSV(from uint32, to uint32) (s string, err error) {
 	records := [][]string{
 		{"race_number", "date", "race_duration", "betting_duration", "end_time", "winner_horses", "volume", "refunded"},

@@ -204,6 +204,31 @@ func (s *Server) Serve(port string) error {
 		s.cacheMux.Unlock()
 	})
 
+	http.HandleFunc("/ranks", func(w http.ResponseWriter, r *http.Request) {
+		enableDecoratorsGz(&w)
+		enableCors(&w)
+		from, to, err := getFromAndTo(r)
+		if err != nil {
+			fmt.Fprintln(w, err.Error())
+		}
+		req := "ranks" + strconv.Itoa(int(from)) + "_" + strconv.Itoa(int(to))
+		s.cacheMux.Lock()
+		_, exists := s.cache[req]
+		if exists {
+			fmt.Fprintln(w, s.cache[req])
+		} else {
+			data, err := s.data.getRanks(from, to)
+			if err != nil {
+				fmt.Fprintln(w, err.Error())
+			} else {
+				str := string(data[:])
+				fmt.Fprintln(w, str)
+				s.cache[req] = str
+			}
+		}
+		s.cacheMux.Unlock()
+	})
+
 	http.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
 		enableDecorators(&w)
 		enableCors(&w)
