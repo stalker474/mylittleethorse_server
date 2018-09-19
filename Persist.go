@@ -407,7 +407,7 @@ func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
 	//sort
 
 	sort.Slice(ranksArray, func(i, j int) bool {
-		return ranksArray[i].ratio < ranksArray[j].ratio
+		return ranksArray[i].ratio > ranksArray[j].ratio
 	})
 
 	var ranksList []Rank
