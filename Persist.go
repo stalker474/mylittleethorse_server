@@ -201,7 +201,7 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
 
-	ranks := p.getRanksArray(from, to)
+	ranks := p.getRanksArray(from, to, true)
 
 	user := User{}
 	user.Address = strings.ToLower(address)
@@ -367,7 +367,7 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 	return buf.String(), err
 }
 
-func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
+func (p *PersistObject) getRanksArray(from uint64, to uint64, all bool) []Rank {
 	wins := make(map[string]uint32)
 	losses := make(map[string]uint32)
 	games := make(map[string]uint32)
@@ -494,7 +494,10 @@ func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
 	var ranksList []Rank
 
 	for _, value := range ranksMap {
-		ranksList = append(ranksList, value)
+		//if requested, filter players without rank
+		if all || (value.GamesCount >= 5) {
+			ranksList = append(ranksList, value)
+		}
 	}
 
 	sort.Slice(ranksList, func(i, j int) bool {
@@ -507,7 +510,7 @@ func (p *PersistObject) getRanks(from uint64, to uint64) (s string, err error) {
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
 
-	data, err := json.Marshal(p.getRanksArray(from, to))
+	data, err := json.Marshal(p.getRanksArray(from, to, false))
 
 	_, err = zw.Write([]byte(data))
 	if err != nil {
