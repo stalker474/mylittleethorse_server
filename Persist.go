@@ -28,50 +28,6 @@ type PersistObject struct {
 	mux       sync.Mutex
 }
 
-// Bet blabla
-type Bet struct {
-	Value float32 `json:"value"`
-	Horse string  `json:"horse"`
-	From  string  `json:"from"`
-}
-
-// odd blabla
-type Odd struct {
-	Value float32 `json:"value"`
-	Horse string  `json:"horse"`
-}
-
-// Withdraw blabla
-type Withdraw struct {
-	Value float32 `json:"value"`
-	To    string  `json:"to"`
-}
-
-// RaceData blabla
-type RaceData struct {
-	ContractID      string     `json:"contractid"`
-	Date            uint64     `json:"date"`
-	RaceDuration    uint64     `json:"race_duration"`
-	BettingDuration uint64     `json:"betting_duration"`
-	EndTime         uint64     `json:"end_time"`
-	RaceNumber      uint32     `json:"race_number"`
-	Version         string     `json:"version"`
-	WinnerHorses    []string   `json:"winner_horses"`
-	Odds            []Odd      `json:"odds"`
-	Bets            []Bet      `json:"bets"`
-	Withdraws       []Withdraw `json:"withdraws"`
-	Volume          float32    `json:"volume"`
-	Refunded        bool       `json:"refunded"`
-	Active          string     `json:"active"`
-	Complete        bool       `json:"complete"`
-}
-
-// Cache blabla
-type Cache struct {
-	List       []RaceData `json:"list"`
-	LastUpdate int64      `json:"last_update"`
-}
-
 // NewPersistObject Create new database
 func NewPersistObject() (p *PersistObject) {
 	p = new(PersistObject)
@@ -241,6 +197,173 @@ func (p *PersistObject) toCharts(from uint64, to uint64) (s string, err error) {
 	return buf.String(), err
 }
 
+func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s string, err error) {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+
+	user := User{}
+	user.Address = strings.ToLower(address)
+	betAmount := float32(0.0)
+	earnedAmount := float32(0.0)
+	wins := make(map[string]uint32)
+	losses := make(map[string]uint32)
+	ranks := make(map[string]float32)
+
+	//used for achievements detection
+	winStreak := 0
+	longestWinStreak := 0
+	lossStreak := 0
+	longestLossStreak := 0
+	isDoubleBettor := false
+	isTripleBettor := false
+
+	p.mux.Lock()
+	for _, race := range server.data.racesData {
+		//count only non refunded closed races
+		if race.Date >= from && race.Date <= to {
+			if !race.Refunded && (strings.Compare(race.Active, "Closed") == 0) {
+				participated := false
+				won := false
+
+				betsCount := make(map[string]bool)
+
+				for _, bet := range race.Bets {
+					won = Contains(race.WinnerHorses, bet.Horse)
+					if won {
+						wins[bet.From]++
+					} else {
+						losses[bet.From]++
+					}
+					//make sure this user exists in the ranks map for later
+					ranks[bet.From] = 0
+
+					if strings.Compare(strings.ToLower(bet.From), user.Address) == 0 {
+						participated = true
+						betAmount += bet.Value
+
+						if won {
+							if longestLossStreak < lossStreak {
+								longestLossStreak = lossStreak
+							}
+							lossStreak = 0
+							winStreak++
+							user.Horseys = append(user.Horseys, Horsey{RaceNumber: race.RaceNumber, RaceAddress: race.ContractID, Symbol: bet.Horse})
+						} else {
+							if longestWinStreak < winStreak {
+								longestWinStreak = winStreak
+							}
+							winStreak = 0
+							lossStreak++
+						}
+
+						betsCount[bet.Horse] = true
+						isTripleBettor = len(betsCount) > 2
+						isDoubleBettor = len(betsCount) > 1
+					}
+				}
+				for _, with := range race.Withdraws {
+					if strings.Compare(strings.ToLower(with.To), user.Address) == 0 {
+						earnedAmount += with.Value
+					}
+				}
+
+				if participated {
+					user.GamesCount++
+					if won {
+						user.WinsCount++
+					} else {
+						user.LossesCount++
+					}
+				}
+			}
+		}
+	}
+	p.mux.Unlock()
+
+	user.Benefit = earnedAmount - betAmount
+
+	type usr struct {
+		address string
+		ratio   float32
+	}
+
+	//compute ranks of everyone based on win/loss ratio
+	var ranksArray []usr
+	for user := range ranks {
+		ranksArray = append(ranksArray, usr{address: user, ratio: float32(wins[user]) / float32(losses[user])})
+	}
+
+	//sort
+
+	sort.Slice(ranksArray, func(i, j int) bool {
+		return ranksArray[i].ratio < ranksArray[j].ratio
+	})
+
+	//find user rank
+	for i := 0; i < len(ranksArray); i++ {
+		if strings.Compare(ranksArray[i].address, user.Address) == 0 {
+			user.Rank = uint32(i + 1)
+		}
+	}
+
+	//handle achievements
+
+	//achievement by games count
+	if user.GamesCount >= 100 {
+		user.Achievements = append(user.Achievements, Achievement{Label: "Whale"})
+	} else if user.GamesCount >= 50 {
+		user.Achievements = append(user.Achievements, Achievement{Label: "Addict"})
+	} else if user.GamesCount >= 10 {
+		user.Achievements = append(user.Achievements, Achievement{Label: "Gambler"})
+	}
+	//achievement by rank
+	if user.Rank == 1 {
+		user.Achievements = append(user.Achievements, Achievement{Label: "Alpha and Omega"})
+	} else if user.Rank <= 3 {
+		user.Achievements = append(user.Achievements, Achievement{Label: "Challenger"})
+	} else if user.Rank <= 10 {
+		user.Achievements = append(user.Achievements, Achievement{Label: "I know what I'm doing"})
+	}
+	//achievement by winning streak
+	if longestWinStreak >= 10 {
+		user.Achievements = append(user.Achievements, Achievement{Label: "This isn't gambling!!!"})
+	} else if longestWinStreak >= 5 {
+		user.Achievements = append(user.Achievements, Achievement{Label: "How do you do it?!!"})
+	} else if longestWinStreak >= 3 {
+		user.Achievements = append(user.Achievements, Achievement{Label: "I start to get this game!"})
+	}
+	//achievement by losing streak
+	if longestLossStreak >= 10 {
+		user.Achievements = append(user.Achievements, Achievement{Label: "Just stop!!!"})
+	} else if longestLossStreak >= 5 {
+		user.Achievements = append(user.Achievements, Achievement{Label: "Stop playing!"})
+	} else if longestLossStreak >= 3 {
+		user.Achievements = append(user.Achievements, Achievement{Label: "Bad luck"})
+	}
+	//achievement based on bet type
+	if isTripleBettor {
+		user.Achievements = append(user.Achievements, Achievement{Label: "I take no risks"})
+	}
+	if isDoubleBettor {
+		user.Achievements = append(user.Achievements, Achievement{Label: "Hedging is key"})
+	}
+	if !isTripleBettor && !isDoubleBettor {
+		user.Achievements = append(user.Achievements, Achievement{Label: "One shot is enough"})
+	}
+	data, err := json.Marshal(user)
+
+	_, err = zw.Write([]byte(data))
+	if err != nil {
+		return s, err
+	}
+
+	if err := zw.Close(); err != nil {
+		return s, err
+	}
+
+	return buf.String(), err
+}
+
 func (p *PersistObject) toCSV(from uint32, to uint32) (s string, err error) {
 	records := [][]string{
 		{"race_number", "date", "race_duration", "betting_duration", "end_time", "winner_horses", "volume", "refunded"},
@@ -311,4 +434,22 @@ func (c *Cache) toMap() map[uint32]RaceData {
 		m[v.RaceNumber] = v
 	}
 	return m
+}
+
+func Contains(s []string, e string) bool {
+	for _, a := range s {
+		if strings.Compare(a, e) == 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func Contains2(s []Withdraw, e string) bool {
+	for _, a := range s {
+		if strings.Compare(a.To, e) == 0 {
+			return true
+		}
+	}
+	return false
 }

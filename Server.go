@@ -172,6 +172,38 @@ func (s *Server) Serve(port string) error {
 		s.cacheMux.Unlock()
 	})
 
+	http.HandleFunc("/user", func(w http.ResponseWriter, r *http.Request) {
+		enableDecoratorsGz(&w)
+		enableCors(&w)
+		from, to, err := getFromAndTo(r)
+		if err != nil {
+			fmt.Fprintln(w, err.Error())
+		}
+		address := ""
+		keysAddress, okAddress := r.URL.Query()["address"]
+
+		if okAddress && (len(keysAddress) > 0) {
+			address = keysAddress[0]
+		}
+
+		req := "user" + strconv.Itoa(int(from)) + "_" + strconv.Itoa(int(to))
+		s.cacheMux.Lock()
+		_, exists := s.cache[req]
+		if exists {
+			fmt.Fprintln(w, s.cache[req])
+		} else {
+			data, err := s.data.getUserData(from, to, address)
+			if err != nil {
+				fmt.Fprintln(w, err.Error())
+			} else {
+				str := string(data[:])
+				fmt.Fprintln(w, str)
+				s.cache[req] = str
+			}
+		}
+		s.cacheMux.Unlock()
+	})
+
 	http.HandleFunc("/admin", func(w http.ResponseWriter, r *http.Request) {
 		enableDecorators(&w)
 		enableCors(&w)

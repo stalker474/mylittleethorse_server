@@ -157,24 +157,6 @@ func fetchRaceData(raceNumber uint32) {
 	atomic.AddUint64(&ops, ^uint64(0))
 }
 
-func contains(s []string, e string) bool {
-	for _, a := range s {
-		if strings.Compare(a, e) == 0 {
-			return true
-		}
-	}
-	return false
-}
-
-func contains2(s []Withdraw, e string) bool {
-	for _, a := range s {
-		if strings.Compare(a.To, e) == 0 {
-			return true
-		}
-	}
-	return false
-}
-
 func updateRaceData(race *RaceData) (bool, error) {
 	original, err := json.Marshal(race)
 	if err != nil {
@@ -219,9 +201,9 @@ func updateRaceData(race *RaceData) (bool, error) {
 	//the race data changed, check if its complete now
 	race.Complete = strings.Compare(race.Active, "Closed") == 0 //must be closed to be complete
 	for _, bet := range race.Bets {
-		if contains(race.WinnerHorses, bet.Horse) || race.Refunded {
+		if Contains(race.WinnerHorses, bet.Horse) || race.Refunded {
 			//this bet was won or was refunded
-			if !contains2(race.Withdraws, bet.From) {
+			if !Contains2(race.Withdraws, bet.From) {
 				race.Complete = false
 				break
 			}
