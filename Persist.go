@@ -446,8 +446,7 @@ func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
 		return ranksWinnerArray[i].ratioWinner > ranksWinnerArray[j].ratioWinner
 	})
 
-	var ranksList []Rank
-	ranksMap := make(map[string]*Rank)
+	ranksMap := make(map[string]Rank)
 
 	rankValue := 0
 	for _, user := range ranksWinLossArray {
@@ -457,14 +456,13 @@ func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
 			rankValue++
 			rank = rankValue
 		}
-		ranksList = append(ranksList, Rank{
+		ranksMap[user.address] = Rank{
 			Address:     user.address,
 			Benefit:     withdrawn[user.address] - wagered[user.address],
 			RankWinLoss: uint32(rank),
 			WinsCount:   wins[user.address],
 			LossesCount: losses[user.address],
-			GamesCount:  games[user.address]})
-		ranksMap[user.address] = &ranksList[len(ranksList)-1]
+			GamesCount:  games[user.address]}
 	}
 
 	rankValue = 0
@@ -475,7 +473,9 @@ func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
 			rankValue++
 			rank = rankValue
 		}
-		ranksMap[user.address].RankCash = uint32(rank)
+		r, _ := ranksMap[user.address]
+		r.RankCash = uint32(rank)
+		ranksMap[user.address] = r
 	}
 
 	rankValue = 0
@@ -486,11 +486,19 @@ func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
 			rankValue++
 			rank = rankValue
 		}
-		ranksMap[user.address].RankCash = uint32(rank)
+		r, _ := ranksMap[user.address]
+		r.RankWinner = uint32(rank)
+		ranksMap[user.address] = r
+	}
+
+	var ranksList []Rank
+
+	for _, value := range ranksMap {
+		ranksList = append(ranksList, value)
 	}
 
 	sort.Slice(ranksList, func(i, j int) bool {
-		return ranksList[i].RankCash < ranksList[j].RankCash
+		return ranksList[i].RankWinner < ranksList[j].RankWinner
 	})
 	return ranksList
 }
