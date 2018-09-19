@@ -229,11 +229,8 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 
 				for _, bet := range race.Bets {
 					betFrom := strings.ToLower(bet.From)
-					won = Contains(race.WinnerHorses, bet.Horse)
-					if won {
-						wins[betFrom]++
-					} else {
-						losses[betFrom]++
+					if !won {
+						won = Contains(race.WinnerHorses, bet.Horse)
 					}
 					//make sure this user exists in the ranks map for later
 					ranks[betFrom] = 0
@@ -271,9 +268,9 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 				if participated {
 					user.GamesCount++
 					if won {
-						user.WinsCount++
+						wins[user.Address]++
 					} else {
-						user.LossesCount++
+						losses[user.Address]++
 					}
 				}
 			}
@@ -384,26 +381,28 @@ func (p *PersistObject) getRanks(from uint64, to uint64) (s string, err error) {
 		//count only non refunded closed races
 		if race.Date >= from && race.Date <= to {
 			if !race.Refunded && (strings.Compare(race.Active, "Closed") == 0) {
-				won := false
-				players := make(map[string]bool)
+				playersWon := make(map[string]bool)
 				for _, bet := range race.Bets {
 					betFrom := strings.ToLower(bet.From)
-					players[betFrom] = true
-					wedgered[betFrom] += bet.Value
-					won = Contains(race.WinnerHorses, bet.Horse)
-					if won {
-						wins[betFrom]++
-					} else {
-						losses[betFrom]++
-					}
 					//make sure this user exists in the ranks map for later
 					ranks[betFrom] = 0
+					wedgered[betFrom] += bet.Value
+					//playersWon should be set to true if one of the players bet did win
+					if !playersWon[betFrom] {
+						playersWon[betFrom] = Contains(race.WinnerHorses, bet.Horse)
+					}
 				}
+
 				for _, with := range race.Withdraws {
 					withdrawn[strings.ToLower(with.To)] += with.Value
 				}
-				for player := range players {
+				for player := range playersWon {
 					games[player]++
+					if playersWon[player] {
+						wins[player]++
+					} else {
+						losses[player]++
+					}
 				}
 			}
 
