@@ -74,10 +74,33 @@ type RaceData struct {
 	Complete        bool       `json:"complete"`
 }
 
+// RaceDataLight blabla
+type RaceDataLight struct {
+	ContractID      string   `json:"contractid"`
+	Date            uint64   `json:"date"`
+	RaceDuration    uint64   `json:"race_duration"`
+	BettingDuration uint64   `json:"betting_duration"`
+	EndTime         uint64   `json:"end_time"`
+	RaceNumber      uint32   `json:"race_number"`
+	Version         string   `json:"version"`
+	WinnerHorses    []string `json:"winner_horses"`
+	Odds            []Odd    `json:"odds"`
+	Volume          float32  `json:"volume"`
+	Refunded        bool     `json:"refunded"`
+	Active          string   `json:"active"`
+	Complete        bool     `json:"complete"`
+}
+
 // Cache blabla
 type Cache struct {
 	List       []RaceData `json:"list"`
 	LastUpdate int64      `json:"last_update"`
+}
+
+// CacheLight blabla
+type CacheLight struct {
+	List       []RaceDataLight `json:"list"`
+	LastUpdate int64           `json:"last_update"`
 }
 
 // Achievement blablabla

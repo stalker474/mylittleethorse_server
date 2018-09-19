@@ -75,10 +75,36 @@ func (p *PersistObject) toJSON(from uint32, to uint32) (s string, err error) {
 	return s, err
 }
 
+func (p *PersistObject) toJSONLight(from uint32, to uint32) (s string, err error) {
+	p.mux.Lock()
+	data, err := json.Marshal(NewCacheLight(p.racesData, from, to))
+	p.mux.Unlock()
+
+	s = string(data[:])
+	return s, err
+}
+
 func (p *PersistObject) toZJSON(from uint32, to uint32) (s string, err error) {
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
 	data, err := p.toJSON(from, to)
+
+	_, err = zw.Write([]byte(data))
+	if err != nil {
+		return s, err
+	}
+
+	if err := zw.Close(); err != nil {
+		return s, err
+	}
+
+	return buf.String(), err
+}
+
+func (p *PersistObject) toZJSONLight(from uint32, to uint32) (s string, err error) {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+	data, err := p.toJSONLight(from, to)
 
 	_, err = zw.Write([]byte(data))
 	if err != nil {
@@ -587,6 +613,35 @@ func NewCache(m map[uint32]RaceData, from uint32, to uint32) (cache *Cache) {
 	}
 	cache.LastUpdate = time.Now().Unix()
 	sort.Sort(ByRaceNumber(cache.List))
+
+	return cache
+}
+
+// NewCacheLight blabla
+func NewCacheLight(m map[uint32]RaceData, from uint32, to uint32) (cache *CacheLight) {
+	cache = new(CacheLight)
+	for _, v := range m {
+		if (v.RaceNumber >= from) && (v.RaceNumber <= to) {
+			cache.List = append(cache.List, RaceDataLight{
+				ContractID:      v.ContractID,
+				Date:            v.Date,
+				RaceDuration:    v.RaceDuration,
+				BettingDuration: v.BettingDuration,
+				EndTime:         v.EndTime,
+				RaceNumber:      v.RaceNumber,
+				Version:         v.Version,
+				WinnerHorses:    v.WinnerHorses,
+				Odds:            v.Odds,
+				Volume:          v.Volume,
+				Refunded:        v.Refunded,
+				Active:          v.Active,
+				Complete:        v.Complete})
+		}
+	}
+	cache.LastUpdate = time.Now().Unix()
+	sort.Slice(cache.List, func(i, j int) bool {
+		return cache.List[i].RaceNumber < cache.List[j].RaceNumber
+	})
 
 	return cache
 }
