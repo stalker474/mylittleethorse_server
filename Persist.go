@@ -223,14 +223,20 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 		if race.Date >= from && race.Date <= to {
 			if !race.Refunded && (strings.Compare(race.Active, "Closed") == 0) {
 				participated := false
-				won := false
-
+				playersWon := make(map[string]bool)
 				betsCount := make(map[string]bool)
+				playerHorses := make(map[string]bool)
 
 				for _, bet := range race.Bets {
 					betFrom := strings.ToLower(bet.From)
-					if !won {
-						won = Contains(race.WinnerHorses, bet.Horse)
+					//playersWon should be set to true if one of the players bet did win
+					winningBet := Contains(race.WinnerHorses, bet.Horse)
+
+					if winningBet {
+						if !playersWon[betFrom] {
+							playersWon[betFrom] = winningBet
+						}
+						playerHorses[bet.Horse] = true
 					}
 					//make sure this user exists in the ranks map for later
 					ranks[betFrom] = 0
@@ -238,21 +244,6 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 					if strings.Compare(betFrom, user.Address) == 0 {
 						participated = true
 						betAmount += bet.Value
-
-						if won {
-							if longestLossStreak < lossStreak {
-								longestLossStreak = lossStreak
-							}
-							lossStreak = 0
-							winStreak++
-							user.Horseys = append(user.Horseys, Horsey{RaceNumber: race.RaceNumber, RaceAddress: race.ContractID, Symbol: bet.Horse})
-						} else {
-							if longestWinStreak < winStreak {
-								longestWinStreak = winStreak
-							}
-							winStreak = 0
-							lossStreak++
-						}
 
 						betsCount[bet.Horse] = true
 						isTripleBettor = len(betsCount) > 2
@@ -266,11 +257,23 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 				}
 
 				if participated {
-					user.GamesCount++
-					if won {
+					if playersWon[user.Address] {
+						if longestLossStreak < lossStreak {
+							longestLossStreak = lossStreak
+						}
+						lossStreak = 0
+						winStreak++
 						wins[user.Address]++
+						for horse := range playerHorses {
+							user.Horseys = append(user.Horseys, Horsey{RaceNumber: race.RaceNumber, RaceAddress: race.ContractID, Symbol: horse})
+						}
 					} else {
+						if longestWinStreak < winStreak {
+							longestWinStreak = winStreak
+						}
 						losses[user.Address]++
+						winStreak = 0
+						lossStreak++
 					}
 				}
 			}
