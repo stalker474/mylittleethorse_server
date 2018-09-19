@@ -202,7 +202,7 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 	zw := gzip.NewWriter(&buf)
 
 	user := User{}
-	user.Address = address
+	user.Address = strings.ToLower(address)
 	betAmount := float32(0.0)
 	earnedAmount := float32(0.0)
 	wins := make(map[string]uint32)
@@ -228,16 +228,17 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 				betsCount := make(map[string]bool)
 
 				for _, bet := range race.Bets {
+					betFrom := strings.ToLower(bet.From)
 					won = Contains(race.WinnerHorses, bet.Horse)
 					if won {
-						wins[bet.From]++
+						wins[betFrom]++
 					} else {
-						losses[bet.From]++
+						losses[betFrom]++
 					}
 					//make sure this user exists in the ranks map for later
-					ranks[bet.From] = 0
+					ranks[betFrom] = 0
 
-					if strings.Compare(bet.From, user.Address) == 0 {
+					if strings.Compare(betFrom, user.Address) == 0 {
 						participated = true
 						betAmount += bet.Value
 
@@ -262,7 +263,7 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 					}
 				}
 				for _, with := range race.Withdraws {
-					if strings.Compare(with.To, user.Address) == 0 {
+					if strings.Compare(strings.ToLower(with.To), user.Address) == 0 {
 						earnedAmount += with.Value
 					}
 				}
