@@ -427,6 +427,10 @@ func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
 			LossesCount: losses[user.address],
 			GamesCount:  games[user.address]})
 	}
+
+	sort.Slice(ranksList, func(i, j int) bool {
+		return ranksList[i].Rank < ranksList[j].Rank
+	})
 	return ranksList
 }
 
