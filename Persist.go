@@ -655,6 +655,7 @@ func (c *Cache) toMap() map[uint32]RaceData {
 	return m
 }
 
+// Contains blabla
 func Contains(s []string, e string) bool {
 	for _, a := range s {
 		if strings.Compare(a, e) == 0 {
@@ -664,6 +665,7 @@ func Contains(s []string, e string) bool {
 	return false
 }
 
+// Contains 2 blabla
 func Contains2(s []Withdraw, e string) bool {
 	for _, a := range s {
 		if strings.Compare(a.To, e) == 0 {
