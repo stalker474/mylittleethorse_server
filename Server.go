@@ -186,7 +186,7 @@ func (s *Server) Serve(port string) error {
 			address = keysAddress[0]
 		}
 
-		req := "user" + strconv.Itoa(int(from)) + "_" + strconv.Itoa(int(to))
+		req := "user" + strconv.Itoa(int(from)) + "_" + strconv.Itoa(int(to)) + "_" + address
 		s.cacheMux.Lock()
 		_, exists := s.cache[req]
 		if exists {
