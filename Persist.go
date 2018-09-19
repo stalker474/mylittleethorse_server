@@ -401,7 +401,7 @@ func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
 	//compute ranks of everyone based on win/loss ratio
 	var ranksArray []usr
 	for user := range ranks {
-		ranksArray = append(ranksArray, usr{address: user, ratio: float32(wins[user]) / float32(losses[user])})
+		ranksArray = append(ranksArray, usr{address: user, ratio: float32(withdrawn[user]) / float32(wagered[user])})
 	}
 
 	//sort
