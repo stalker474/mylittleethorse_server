@@ -640,7 +640,7 @@ func NewCacheLight(m map[uint32]RaceData, from uint32, to uint32) (cache *CacheL
 	}
 	cache.LastUpdate = time.Now().Unix()
 	sort.Slice(cache.List, func(i, j int) bool {
-		return cache.List[i].RaceNumber < cache.List[j].RaceNumber
+		return cache.List[i].RaceNumber > cache.List[j].RaceNumber
 	})
 
 	return cache
