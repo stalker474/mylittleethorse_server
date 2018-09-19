@@ -201,13 +201,10 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 	var buf bytes.Buffer
 	zw := gzip.NewWriter(&buf)
 
+	ranks := p.getRanksArray(from, to)
+
 	user := User{}
 	user.Address = strings.ToLower(address)
-	betAmount := float32(0.0)
-	earnedAmount := float32(0.0)
-	wins := make(map[string]uint32)
-	losses := make(map[string]uint32)
-	ranks := make(map[string]float32)
 
 	//used for achievements detection
 	winStreak := 0
@@ -216,6 +213,8 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 	longestLossStreak := 0
 	isDoubleBettor := false
 	isTripleBettor := false
+	topBet := float32(0)
+	topEarn := float32(0)
 
 	p.mux.Lock()
 	for _, race := range server.data.racesData {
@@ -238,21 +237,23 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 						}
 						playerHorses[bet.Horse] = true
 					}
-					//make sure this user exists in the ranks map for later
-					ranks[betFrom] = 0
 
 					if strings.Compare(betFrom, user.Address) == 0 {
 						participated = true
-						betAmount += bet.Value
-
 						betsCount[bet.Horse] = true
 						isTripleBettor = len(betsCount) > 2
 						isDoubleBettor = len(betsCount) > 1
+
+						if bet.Value > topBet {
+							topBet = bet.Value
+						}
 					}
 				}
 				for _, with := range race.Withdraws {
 					if strings.Compare(strings.ToLower(with.To), user.Address) == 0 {
-						earnedAmount += with.Value
+						if with.Value > topEarn {
+							topEarn = with.Value
+						}
 					}
 				}
 
@@ -263,7 +264,6 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 						}
 						lossStreak = 0
 						winStreak++
-						wins[user.Address]++
 						for horse := range playerHorses {
 							user.Horseys = append(user.Horseys, Horsey{RaceNumber: race.RaceNumber, RaceAddress: race.ContractID, Symbol: horse})
 						}
@@ -271,7 +271,6 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 						if longestWinStreak < winStreak {
 							longestWinStreak = winStreak
 						}
-						losses[user.Address]++
 						winStreak = 0
 						lossStreak++
 					}
@@ -281,29 +280,13 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 	}
 	p.mux.Unlock()
 
-	user.Benefit = earnedAmount - betAmount
-
-	type usr struct {
-		address string
-		ratio   float32
-	}
-
-	//compute ranks of everyone based on win/loss ratio
-	var ranksArray []usr
-	for user := range ranks {
-		ranksArray = append(ranksArray, usr{address: user, ratio: float32(wins[user]) / float32(losses[user])})
-	}
-
-	//sort
-
-	sort.Slice(ranksArray, func(i, j int) bool {
-		return ranksArray[i].ratio < ranksArray[j].ratio
-	})
-
-	//find user rank
-	for i := 0; i < len(ranksArray); i++ {
-		if strings.Compare(ranksArray[i].address, user.Address) == 0 {
-			user.Rank = uint32(i + 1)
+	for _, u := range ranks {
+		if strings.Compare(u.Address, user.Address) == 0 {
+			user.Rank = u.Rank
+			user.GamesCount = u.GamesCount
+			user.Benefit = u.Benefit
+			user.WinsCount = u.WinsCount
+			user.LossesCount = u.LossesCount
 		}
 	}
 
@@ -368,10 +351,7 @@ func (p *PersistObject) getUserData(from uint64, to uint64, address string) (s s
 	return buf.String(), err
 }
 
-func (p *PersistObject) getRanks(from uint64, to uint64) (s string, err error) {
-	var buf bytes.Buffer
-	zw := gzip.NewWriter(&buf)
-
+func (p *PersistObject) getRanksArray(from uint64, to uint64) []Rank {
 	wins := make(map[string]uint32)
 	losses := make(map[string]uint32)
 	games := make(map[string]uint32)
@@ -440,8 +420,14 @@ func (p *PersistObject) getRanks(from uint64, to uint64) (s string, err error) {
 			LossesCount: losses[user.address],
 			GamesCount:  games[user.address]})
 	}
+	return ranksList
+}
 
-	data, err := json.Marshal(ranksList)
+func (p *PersistObject) getRanks(from uint64, to uint64) (s string, err error) {
+	var buf bytes.Buffer
+	zw := gzip.NewWriter(&buf)
+
+	data, err := json.Marshal(p.getRanksArray(from, to))
 
 	_, err = zw.Write([]byte(data))
 	if err != nil {
