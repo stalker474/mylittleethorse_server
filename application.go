@@ -215,6 +215,10 @@ func updateRaceData(race *RaceData) (bool, error) {
 	}
 	if race.Refunded {
 		race.Complete = true
+	} else {
+		if len(race.Withdraws) == 0 {
+			race.Complete = false
+		}
 	}
 	now, err := json.Marshal(race)
 	if err != nil {
