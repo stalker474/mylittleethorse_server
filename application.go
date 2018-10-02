@@ -200,7 +200,7 @@ func updateRaceData(race *RaceData) (bool, error) {
 
 	//the race data changed, check if its complete now
 	race.Complete = strings.Compare(race.Active, "Closed") == 0 //must be closed to be complete
-	if len(race.Bets) == 0 || race.Bets == nil {
+	if len(race.Bets) == 0 {
 		//races without bets
 		race.Complete = false
 	}
@@ -212,6 +212,9 @@ func updateRaceData(race *RaceData) (bool, error) {
 				break
 			}
 		}
+	}
+	if race.Refunded {
+		race.Complete = true
 	}
 	now, err := json.Marshal(race)
 	if err != nil {
