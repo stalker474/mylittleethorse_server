@@ -307,12 +307,16 @@ func updateRaceData022(race *RaceData) error {
 		race.Withdraws = append(race.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
 	}
 
-	if (race.Bets == nil) || (race.WinnerHorses == nil) && (strings.Compare(race.Active, "Closed") == 0) {
-		log.Println("Refunded detected for race #", race.RaceNumber)
-		log.Println("Bets count:", len(race.Bets))
-		log.Println("Winner horses:", len(race.WinnerHorses))
-		log.Println("Active:", race.Active)
-		race.Refunded = true
+	///
+	///
+	contractHelper, err := NewHorseyHelper(common.HexToAddress("0xe1d7ef76e0fb7c9fd3a583c9036bdd3e1322449e"), conn)
+	if err != nil {
+		return err
+	}
+
+	race.Refunded, err = contractHelper.IsRefunded(nil, common.HexToAddress(race.ContractID))
+	if err != nil {
+		return err
 	}
 	return nil
 }
@@ -355,12 +359,6 @@ func updateRaceData023(race *RaceData) error {
 		withdraws, err = contract.Betting023Filterer.FilterWithdraw(&bind.FilterOpts{Start: firstBlock, End: &lastBlock, Context: nil})
 	}
 	defer withdraws.Close()
-	refunds, err := contract.Betting023Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: firstBlock, End: &lastBlock, Context: nil})
-	for err != nil {
-		log.Println("#", race.RaceNumber, " Error : ", err)
-		refunds, err = contract.Betting023Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: firstBlock, End: &lastBlock, Context: nil})
-	}
-	defer refunds.Close()
 
 	if btcWon || ltcWon || ethWon {
 		race.WinnerHorses = nil
@@ -401,12 +399,23 @@ func updateRaceData023(race *RaceData) error {
 		race.Withdraws = append(race.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
 	}
 
-	race.Refunded = refunds.Next()
+	///
+	///
+	contractHelper, err := NewHorseyHelper(common.HexToAddress("0xe1d7ef76e0fb7c9fd3a583c9036bdd3e1322449e"), conn)
+	if err != nil {
+		return err
+	}
+
+	race.Refunded, err = contractHelper.IsRefunded(nil, common.HexToAddress(race.ContractID))
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
 func updateRaceData024(race *RaceData) error {
-	conn, err := ethclient.Dial("https://mainnet.infura.io/76d846153845432cb5760b832c6bd0f0")
+	conn, err := ethclient.Dial("wss://mainnet.infura.io/ws")
+	defer conn.Close()
 	if err != nil {
 		log.Fatalf("Failed to init node: %v", err)
 	}
@@ -434,19 +443,13 @@ func updateRaceData024(race *RaceData) error {
 		log.Println("#", race.RaceNumber, " Error deposits: ", err)
 		deposits, err = contract.Betting024Filterer.FilterDeposit(&bind.FilterOpts{Start: firstBlock, End: nil, Context: nil})
 	}
-	//defer deposits.Close()
+	defer deposits.Close()
 	withdraws, err := contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: firstBlock, End: nil, Context: nil})
 	for err != nil {
 		log.Println("#", race.RaceNumber, " Error withdraws: ", err)
 		withdraws, err = contract.Betting024Filterer.FilterWithdraw(&bind.FilterOpts{Start: firstBlock, End: nil, Context: nil})
 	}
-	//defer withdraws.Close()
-	refunds, err := contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: firstBlock, End: nil, Context: nil})
-	for err != nil {
-		log.Println("#", race.RaceNumber, " Error refunds: ", err)
-		refunds, err = contract.Betting024Filterer.FilterRefundEnabled(&bind.FilterOpts{Start: firstBlock, End: nil, Context: nil})
-	}
-	//defer refunds.Close()
+	defer withdraws.Close()
 
 	if btcWon || ltcWon || ethWon {
 		race.WinnerHorses = nil
@@ -487,6 +490,16 @@ func updateRaceData024(race *RaceData) error {
 		race.Withdraws = append(race.Withdraws, Withdraw{WeiToEth(withdraws.Event.Value), withdraws.Event.To.Hex()})
 	}
 
-	race.Refunded = refunds.Next()
+	///
+	///
+	contractHelper, err := NewHorseyHelper(common.HexToAddress("0xe1d7ef76e0fb7c9fd3a583c9036bdd3e1322449e"), conn)
+	if err != nil {
+		return err
+	}
+
+	race.Refunded, err = contractHelper.IsRefunded(nil, common.HexToAddress(race.ContractID))
+	if err != nil {
+		return err
+	}
 	return nil
 }
